@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Statistiques Candidatures</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="data.js"></script>
+  <style>
+    :root {
+      --primary:     #1a3a5c;
+      --primary-2:   #234875;
+      --accent:      #e8a020;
+      --green:       #22c55e;
+      --red:         #ef4444;
+      --amber:       #f59e0b;
+      --blue:        #3b82f6;
+      --purple:      #8b5cf6;
+      --teal:        #14b8a6;
+      --bg:          #f0f4f8;
+      --card:        #ffffff;
+      --text:        #1e293b;
+      --muted:       #64748b;
+      --border:      #e2e8f0;
+      --radius:      12px;
+      --shadow:      0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.06);
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    /* ── HEADER ──────────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, var(--primary) 0%, #1e4d8c 100%);
+      color: #fff;
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      box-shadow: 0 2px 16px rgba(0,0,0,.25);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .hdr-title h1 { font-size: 19px; font-weight: 700; letter-spacing: -.3px; }
+    .hdr-title p  { font-size: 11.5px; opacity: .72; margin-top: 2px; }
+
+    .hdr-controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .ctrl { display: flex; align-items: center; gap: 7px; }
+    .ctrl-lbl { font-size: 11.5px; opacity: .8; white-space: nowrap; }
+
+    select.hdr-sel {
+      border: none;
+      border-radius: 7px;
+      padding: 6px 10px;
+      font-size: 13px;
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      outline: none;
+      cursor: pointer;
+    }
+    select.hdr-sel option { background: #1a3a5c; color: #fff; }
+
+    .btn-grp {
+      display: flex;
+      background: rgba(255,255,255,.12);
+      border-radius: 7px;
+      padding: 3px;
+      gap: 2px;
+    }
+    .btn-grp button {
+      border: none;
+      border-radius: 5px;
+      padding: 5px 13px;
+      font-size: 12.5px;
+      font-weight: 600;
+      background: transparent;
+      color: rgba(255,255,255,.72);
+      cursor: pointer;
+      transition: all .18s;
+    }
+    .btn-grp button.active { background: #fff; color: var(--primary); }
+
+    /* ── MAIN ────────────────────────────────────────────────── */
+    main { padding: 22px 28px; max-width: 1560px; margin: 0 auto; }
+
+    /* ── KPI CARDS ───────────────────────────────────────────── */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+      gap: 13px;
+      margin-bottom: 22px;
+    }
+
+    .kpi {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+      border-left: 4px solid var(--primary);
+      transition: transform .15s, box-shadow .15s;
+    }
+    .kpi:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.1); }
+    .kpi.blue   { border-left-color: var(--blue); }
+    .kpi.green  { border-left-color: var(--green); }
+    .kpi.amber  { border-left-color: var(--amber); }
+    .kpi.purple { border-left-color: var(--purple); }
+    .kpi.teal   { border-left-color: var(--teal); }
+
+    .kpi-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 600; margin-bottom: 7px; }
+    .kpi-val { font-size: 25px; font-weight: 700; line-height: 1; }
+    .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+    /* ── GRID ────────────────────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 15px; margin-bottom: 15px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 15px; }
+
+    /* ── BARRE VISIBILITÉ CHARTS ─────────────────────────────── */
+    .vis-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      box-shadow: var(--shadow);
+      margin-bottom: 15px;
+    }
+    .vis-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-right: 4px;
+      white-space: nowrap;
+    }
+    .vis-btn {
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      background: #fff;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .vis-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    /* ── CARD ────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      margin-bottom: 15px;
+    }
+
+    .card-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 8px;
+    }
+
+    .card-ttl {
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--primary);
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: #f1f5f9;
+      color: var(--muted);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .chart-box { position: relative; height: 270px; }
+    .chart-box.tall { height: 320px; }
+
+    /* ── TABLE ───────────────────────────────────────────────── */
+    .tbl-ctrl {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tbl-toggle {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .tbl-wrap { overflow-x: auto; border-radius: 8px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      min-width: 1100px;
+    }
+
+    thead tr { background: var(--primary); color: #fff; }
+
+    thead th {
+      padding: 10px 11px;
+      text-align: right;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    thead th:first-child { text-align: left; }
+    thead th:hover { background: var(--primary-2); }
+    thead th.sorted { background: var(--primary-2); }
+    thead th.sorted::after { content: ' ↓'; }
+    thead th.sorted.asc::after { content: ' ↑'; }
+
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f7faff; }
+    tbody tr.zero-row { opacity: .5; }
+    tbody tr.zero-row.hidden { display: none; }
+    tbody tr.total-row { background: #f1f5f9; font-weight: 700; border-top: 2px solid var(--border); }
+
+    td { padding: 8px 11px; text-align: right; }
+    td:first-child { text-align: left; }
+
+    .src-name { font-weight: 500; }
+    .typ-badge {
+      display: inline-block;
+      font-size: 9.5px;
+      padding: 1.5px 5px;
+      border-radius: 4px;
+      margin-left: 5px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+    .typ-g { background: #dcfce7; color: #15803d; }
+    .typ-p { background: #fef3c7; color: #b45309; }
+
+    .pos { color: var(--green); font-weight: 600; }
+    .neg { color: var(--red);   font-weight: 600; }
+    .dim { color: var(--muted); }
+
+    /* ── CHART TOGGLE ────────────────────────────────────────── */
+    .chart-toggle {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 9px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      background: #fff;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .chart-toggle.on {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #fff;
+    }
+
+    /* ── TOOLTIP HINT ────────────────────────────────────────── */
+    abbr { text-decoration: underline dotted; cursor: help; }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HEADER ══════════════════════════════════════════════════ -->
+<header>
+  <div class="hdr-title">
+    <h1>📊 Dashboard Candidatures</h1>
+    <p>RAS Intérim — Statistiques de recrutement par jobboard</p>
+  </div>
+  <div class="hdr-controls">
+    <div class="ctrl">
+      <span class="ctrl-lbl">Période</span>
+      <select class="hdr-sel" id="sel-month"></select>
+    </div>
+    <div class="ctrl">
+      <span class="ctrl-lbl">Sources</span>
+      <div class="btn-grp">
+        <button class="active" data-type="all"     onclick="setType('all')">Toutes</button>
+        <button               data-type="gratuit"  onclick="setType('gratuit')">Gratuites</button>
+        <button               data-type="payant"   onclick="setType('payant')">Payantes</button>
+      </div>
+    </div>
+    <div class="ctrl">
+      <div class="btn-grp">
+        <button id="tog-global" onclick="toggleAllZ()">Masquer inactives</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ MAIN ═════════════════════════════════════════════════════ -->
+<main>
+
+  <!-- KPI Cards -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-lbl">CVs reçus</div>
+      <div class="kpi-val" id="k-cv">—</div>
+      <div class="kpi-sub" id="k-cv-s"></div>
+    </div>
+    <div class="kpi blue">
+      <div class="kpi-lbl"><abbr title="Nouveaux candidats">Cand. Nouv.</abbr></div>
+      <div class="kpi-val" id="k-cand">—</div>
+      <div class="kpi-sub" id="k-cand-s"></div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-lbl">Intérimaires placés</div>
+      <div class="kpi-val" id="k-int">—</div>
+      <div class="kpi-sub" id="k-int-s"></div>
+    </div>
+    <div class="kpi amber">
+      <div class="kpi-lbl">Budget total</div>
+      <div class="kpi-val" id="k-budget">—</div>
+      <div class="kpi-sub" id="k-budget-s"></div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-lbl">CA Total HRFA</div>
+      <div class="kpi-val" id="k-ca">—</div>
+      <div class="kpi-sub" id="k-ca-s"></div>
+    </div>
+    <div class="kpi teal">
+      <div class="kpi-lbl">Marge Totale</div>
+      <div class="kpi-val" id="k-marge">—</div>
+      <div class="kpi-sub" id="k-marge-s"></div>
+    </div>
+  </div>
+
+  <!-- Charts row 1 : CVs + Intérimaires -->
+  <div class="grid-2">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-hdr">
+        <span class="card-ttl">CVs reçus par source</span>
+        <button class="chart-toggle" id="tog-cv" onclick="toggleZ('c-cv','tog-cv')">Masquer inactives</button>
+        <span class="badge" id="b-cv">—</span>
+      </div>
+      <div class="chart-box"><canvas id="c-cv"></canvas></div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="card-hdr">
+        <span class="card-ttl">Intérimaires placés par source</span>
+        <button class="chart-toggle" id="tog-int" onclick="toggleZ('c-int','tog-int')">Masquer inactives</button>
+        <span class="badge" id="b-int">—</span>
+      </div>
+      <div class="chart-box"><canvas id="c-int"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Charts row 2 : ROI + Budget/Marge -->
+  <div class="grid-2">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-hdr">
+        <span class="card-ttl">ROI Réel Marge — sources payantes</span>
+        <button class="chart-toggle" id="tog-roi" onclick="toggleZ('c-roi','tog-roi')">Masquer inactives</button>
+        <span class="badge">Marge ÷ Budget</span>
+      </div>
+      <div class="chart-box"><canvas id="c-roi"></canvas></div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="card-hdr">
+        <span class="card-ttl">Budget vs Marge — sources payantes</span>
+        <button class="chart-toggle" id="tog-bm" onclick="toggleZ('c-bm','tog-bm')">Masquer inactives</button>
+        <span class="badge">€</span>
+      </div>
+      <div class="chart-box"><canvas id="c-bm"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Charts row 3 : Taux de transformation -->
+  <div class="grid-3">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-hdr">
+        <span class="card-ttl">Taux Nouveaux (CV → Cand.)</span>
+        <button class="chart-toggle" id="tog-tx" onclick="toggleZ('c-tx-cand','tog-tx')">Masquer inactives</button>
+        <span class="badge">%</span>
+      </div>
+      <div class="chart-box"><canvas id="c-tx-cand"></canvas></div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="card-hdr">
+        <span class="card-ttl">% Nouveaux intérimaires (nINT)</span>
+        <button class="chart-toggle" id="tog-nint" onclick="toggleZ('c-nint','tog-nint')">Masquer inactives</button>
+        <span class="badge">fidélisation</span>
+      </div>
+      <div class="chart-box"><canvas id="c-nint"></canvas></div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="card-hdr">
+        <span class="card-ttl">CA par source</span>
+        <button class="chart-toggle" id="tog-ca" onclick="toggleZ('c-ca','tog-ca')">Masquer inactives</button>
+        <span class="badge" id="b-ca">—</span>
+      </div>
+      <div class="chart-box"><canvas id="c-ca"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Evolution (visible si plusieurs mois) -->
+  <div id="evo-section" style="display:none">
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-ttl">Évolution mensuelle</span>
+        <select id="sel-evo" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);background:#fff;cursor:pointer;">
+          <option value="nb_cv">CVs reçus</option>
+          <option value="new_cand">Candidats Nouveaux</option>
+          <option value="nb_int">Intérimaires placés</option>
+          <option value="ca">CA Total</option>
+          <option value="marge">Marge</option>
+          <option value="budget">Budget</option>
+        </select>
+      </div>
+      <div class="chart-box tall"><canvas id="c-evo"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Tableau complet -->
+  <div class="card">
+    <div class="card-hdr">
+      <span class="card-ttl">Tableau détaillé</span>
+      <div class="tbl-ctrl">
+        <label class="tbl-toggle">
+          <input type="checkbox" id="hide-zero" onchange="render()" checked>
+          Masquer sources inactives
+        </label>
+        <span class="badge" id="b-tbl">—</span>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="doSort('source')">Source</th>
+            <th onclick="doSort('budget')">Budget</th>
+            <th onclick="doSort('nb_cv')">Nb CV</th>
+            <th onclick="doSort('candidat_uniq')">Cand. Uniq.</th>
+            <th onclick="doSort('new_cand')"><abbr title="Nouveaux candidats">Cand. Nouv.</abbr></th>
+            <th onclick="doSort('tx_new_cand')">Tx Nouv.</th>
+            <th onclick="doSort('cpnc')"><abbr title="Coût par nouveau candidat">CPNC</abbr></th>
+            <th onclick="doSort('nb_int')">Nb Int.</th>
+            <th onclick="doSort('tx_emploi')">Tx Emploi</th>
+            <th onclick="doSort('cme')"><abbr title="Coût par mise à l'emploi">CME</abbr></th>
+            <th onclick="doSort('n_int')"><abbr title="Nouveaux intérimaires">nINT</abbr></th>
+            <th onclick="doSort('pct_n_int')">% nINT</th>
+            <th onclick="doSort('ca')">CA Total</th>
+            <th onclick="doSort('roi_brut')"><abbr title="ROI brut sur CA">ROI CA</abbr></th>
+            <th onclick="doSort('marge')">Marge</th>
+            <th onclick="doSort('pct_marge')">% Marge</th>
+            <th onclick="doSort('roi_reel')"><abbr title="ROI réel sur marge">ROI Marge</abbr></th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══ SCRIPT ═══════════════════════════════════════════════════ -->
+<script>
+// ─── État global ───────────────────────────────────────────────
+let gMonth = 'all';
+let gType  = 'all';
+let gSortCol = 'ca';
+let gSortAsc = false;
+
+// ─── Helpers format ────────────────────────────────────────────
+const f = {
+  n:    v => v == null ? '—' : Math.round(v).toLocaleString('fr-FR'),
+  eur:  v => v == null ? '—' : v.toLocaleString('fr-FR', {style:'currency',currency:'EUR',maximumFractionDigits:0}),
+  eur2: v => v == null ? '—' : v.toLocaleString('fr-FR', {style:'currency',currency:'EUR',minimumFractionDigits:2}),
+  pct:  v => v == null ? '—' : (v * 100).toFixed(1) + ' %',
+  x:    v => v == null ? '—' : v.toFixed(2) + '×',
+  keur: v => v == null ? '—' : v >= 1000 ? `${(v/1000).toFixed(0)} k€` : `${Math.round(v)} €`,
+};
+
+function sum(rows, key) { return rows.reduce((a, r) => a + (r[key] || 0), 0); }
+
+function getAggregatedData() {
+  const sourceMap = {};
+  Object.values(STATS_DATA).forEach(monthData => {
+    monthData.rows.forEach(r => {
+      if (!sourceMap[r.source]) {
+        sourceMap[r.source] = { source: r.source, type: r.type, budget: 0, nb_cv: 0, candidat_uniq: 0, new_cand: 0, nb_int: 0, n_int: 0, ca: 0, marge: 0 };
+      }
+      const s = sourceMap[r.source];
+      s.budget       += r.budget       || 0;
+      s.nb_cv        += r.nb_cv        || 0;
+      s.candidat_uniq += r.candidat_uniq || 0;
+      s.new_cand     += r.new_cand     || 0;
+      s.nb_int       += r.nb_int       || 0;
+      s.n_int        += r.n_int        || 0;
+      s.ca           += r.ca           || 0;
+      s.marge        += r.marge        || 0;
+    });
+  });
+  return Object.values(sourceMap).map(s => ({
+    ...s,
+    cpa_cv:      s.budget > 0 && s.nb_cv > 0      ? s.budget / s.nb_cv        : null,
+    tx_new_cand: s.nb_cv > 0                        ? s.new_cand / s.nb_cv      : null,
+    cpnc:        s.new_cand > 0 && s.budget > 0    ? s.budget / s.new_cand     : null,
+    tx_emploi:   s.candidat_uniq > 0               ? s.nb_int / s.candidat_uniq : null,
+    cme:         s.nb_int > 0 && s.budget > 0      ? s.budget / s.nb_int       : null,
+    pct_n_int:   s.nb_int > 0                       ? s.n_int / s.nb_int        : null,
+    pct_marge:   s.ca > 0                           ? s.marge / s.ca            : null,
+    roi_brut:    s.budget > 0                       ? s.ca / s.budget           : null,
+    roi_reel:    s.budget > 0                       ? s.marge / s.budget        : null,
+  }));
+}
+
+function getData() {
+  const rows = gMonth === 'all' ? getAggregatedData() : (STATS_DATA[gMonth]?.rows || []);
+  return gType === 'all' ? rows : rows.filter(r => r.type === gType);
+}
+
+// ─── Couleurs par source (cohérentes sur tous les charts) ──────
+const PAL = [
+  '#3b82f6','#22c55e','#f59e0b','#8b5cf6','#14b8a6',
+  '#f43f5e','#6366f1','#06b6d4','#84cc16','#ec4899',
+  '#fb923c','#a78bfa','#34d399','#fbbf24','#60a5fa',
+  '#4ade80','#c084fc','#2dd4bf','#fb7185','#818cf8',
+];
+const SOURCE_COLORS = {};
+function buildColorMap() {
+  const seen = [];
+  Object.values(STATS_DATA).forEach(m =>
+    m.rows.forEach(r => { if (!seen.includes(r.source)) seen.push(r.source); })
+  );
+  seen.forEach((s, i) => { SOURCE_COLORS[s] = PAL[i % PAL.length]; });
+}
+
+// ─── État masquer inactives (par chart) ────────────────────────
+const HIDE_ZERO = {};
+const ALL_CHART_TOGGLES = [
+  ['c-cv',      'tog-cv'],
+  ['c-int',     'tog-int'],
+  ['c-roi',     'tog-roi'],
+  ['c-bm',      'tog-bm'],
+  ['c-tx-cand', 'tog-tx'],
+  ['c-nint',    'tog-nint'],
+  ['c-ca',      'tog-ca'],
+];
+
+function toggleZ(chartId, btnId) {
+  HIDE_ZERO[chartId] = !HIDE_ZERO[chartId];
+  const btn = document.getElementById(btnId);
+  btn.classList.toggle('on', HIDE_ZERO[chartId]);
+  btn.textContent = HIDE_ZERO[chartId] ? 'Afficher toutes' : 'Masquer inactives';
+  syncGlobalToggle();
+  updateCharts();
+}
+
+function toggleAllZ() {
+  const globalBtn = document.getElementById('tog-global');
+  const on = !globalBtn.classList.contains('active');
+  ALL_CHART_TOGGLES.forEach(([chartId, btnId]) => {
+    HIDE_ZERO[chartId] = on;
+    const btn = document.getElementById(btnId);
+    btn.classList.toggle('on', on);
+    btn.textContent = on ? 'Afficher toutes' : 'Masquer inactives';
+  });
+  document.getElementById('hide-zero').checked = on;
+  globalBtn.classList.toggle('active', on);
+  globalBtn.textContent = on ? 'Afficher toutes' : 'Masquer inactives';
+  render();
+}
+
+function syncGlobalToggle() {
+  const allOn = ALL_CHART_TOGGLES.every(([chartId]) => HIDE_ZERO[chartId]);
+  const globalBtn = document.getElementById('tog-global');
+  globalBtn.classList.toggle('active', allOn);
+  globalBtn.textContent = allOn ? 'Afficher toutes' : 'Masquer inactives';
+}
+
+// ─── Contrôles header ──────────────────────────────────────────
+function initMonthSel() {
+  const sel = document.getElementById('sel-month');
+  const all = document.createElement('option');
+  all.value = 'all'; all.textContent = 'Tous les mois';
+  all.selected = true;
+  sel.appendChild(all);
+  Object.entries(STATS_DATA)
+    .sort(([a],[b]) => b.localeCompare(a))
+    .forEach(([k, v]) => {
+      const o = document.createElement('option');
+      o.value = k; o.textContent = v.label;
+      sel.appendChild(o);
+    });
+  sel.onchange = () => { gMonth = sel.value; render(); };
+}
+
+function setType(t) {
+  gType = t;
+  document.querySelectorAll('.btn-grp button').forEach(b =>
+    b.classList.toggle('active', b.dataset.type === t)
+  );
+  render();
+}
+
+// ─── KPI Cards ─────────────────────────────────────────────────
+function updateKPIs() {
+  const rows  = getData();
+  const tCV   = sum(rows, 'nb_cv');
+  const tCand = sum(rows, 'new_cand');
+  const tInt  = sum(rows, 'nb_int');
+  const tBud  = sum(rows, 'budget');
+  const tCA   = sum(rows, 'ca');
+  const tMar  = sum(rows, 'marge');
+
+  document.getElementById('k-cv').textContent     = f.n(tCV);
+  document.getElementById('k-cv-s').textContent   = rows.filter(r => r.nb_cv > 0).length + ' sources actives';
+
+  document.getElementById('k-cand').textContent   = f.n(tCand);
+  document.getElementById('k-cand-s').textContent = tCV > 0 ? `Taux : ${(tCand/tCV*100).toFixed(1)} %` : '';
+
+  document.getElementById('k-int').textContent    = f.n(tInt);
+  document.getElementById('k-int-s').textContent  = tCV > 0 ? `Tx mise à l'emploi : ${(tInt/tCV*100).toFixed(1)} %` : '';
+
+  document.getElementById('k-budget').textContent  = f.keur(tBud);
+  document.getElementById('k-budget-s').textContent = rows.filter(r=>r.type==='payant').length + ' sources payantes';
+
+  document.getElementById('k-ca').textContent     = f.keur(tCA);
+  document.getElementById('k-ca-s').textContent   = tBud > 0 ? `ROI brut : ${(tCA/tBud).toFixed(1)}×` : 'Sources gratuites';
+
+  document.getElementById('k-marge').textContent  = f.keur(tMar);
+  document.getElementById('k-marge-s').textContent = tCA > 0 ? `% Marge : ${(tMar/tCA*100).toFixed(0)} %` : '';
+}
+
+// ─── Charts ────────────────────────────────────────────────────
+const CH = {};   // instances Chart.js
+
+function makeHBar(id, labels, vals, colors, opts = {}) {
+  if (CH[id]) CH[id].destroy();
+  const h = Math.max(180, labels.length * 32);
+  document.getElementById(id).parentElement.style.height = h + 'px';
+  const ctx = document.getElementById(id).getContext('2d');
+  CH[id] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: vals, backgroundColor: colors, borderRadius: 5, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => {
+              const v = c.raw;
+              if (opts.eur)  return ' ' + f.eur2(v);
+              if (opts.pct)  return ' ' + f.pct(v);
+              if (opts.roi)  return ' ' + f.x(v);
+              return ' ' + v.toLocaleString('fr-FR');
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ticks: {
+            font: { size: 10 },
+            callback: v => {
+              if (opts.eur)  return v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v}€`;
+              if (opts.pct)  return `${(v*100).toFixed(0)} %`;
+              if (opts.roi)  return `${v}×`;
+              return v >= 1000 ? `${(v/1000).toFixed(0)}k` : v;
+            }
+          }
+        },
+        y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function makeGroupBar(id, labels, datasets) {
+  if (CH[id]) CH[id].destroy();
+  const ctx = document.getElementById(id).getContext('2d');
+  CH[id] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } },
+        tooltip: {
+          callbacks: {
+            label: c => ` ${c.dataset.label} : ${f.eur(c.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 35 } },
+        y: {
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ticks: { font: { size: 10 }, callback: v => v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v}€` }
+        }
+      }
+    }
+  });
+}
+
+// Dessine un bar chart horizontal avec couleurs par source + hauteur dynamique
+function drawHBar(id, rows, valueKey, opts = {}) {
+  const hideZ = HIDE_ZERO[id];
+  let sorted = [...rows].sort((a, b) => (b[valueKey] || 0) - (a[valueKey] || 0));
+  if (hideZ) sorted = sorted.filter(r => (r[valueKey] || 0) !== 0 && r[valueKey] != null);
+  makeHBar(
+    id,
+    sorted.map(r => r.source),
+    sorted.map(r => r[valueKey] || 0),
+    sorted.map(r => SOURCE_COLORS[r.source] || '#999'),
+    opts
+  );
+}
+
+function updateCharts() {
+  const rows = getData();
+
+  // 1. CVs par source — toutes sources
+  drawHBar('c-cv', rows, 'nb_cv');
+  document.getElementById('b-cv').textContent = f.n(sum(rows,'nb_cv')) + ' total';
+
+  // 2. Intérimaires par source — toutes sources
+  drawHBar('c-int', rows, 'nb_int');
+  document.getElementById('b-int').textContent = f.n(sum(rows,'nb_int')) + ' total';
+
+  // 3. ROI Réel — sources payantes uniquement
+  const payR = rows.filter(r => r.type === 'payant');
+  const roiAll = payR.map(r => ({ ...r, roi_reel: r.roi_reel === null ? 0 : r.roi_reel }));
+  const hideRoi = HIDE_ZERO['c-roi'];
+  const roiSorted = [...(hideRoi ? payR.filter(r => r.roi_reel != null && r.roi_reel !== -1) : roiAll)]
+    .sort((a, b) => (b.roi_reel || 0) - (a.roi_reel || 0));
+  makeHBar('c-roi',
+    roiSorted.map(r => r.source),
+    roiSorted.map(r => r.roi_reel || 0),
+    roiSorted.map(r => {
+      const v = r.roi_reel || 0;
+      return v >= 1 ? '#22c55e' : v > 0 ? '#f59e0b' : '#ef4444';
+    }),
+    { roi: true }
+  );
+
+  // 4. Budget vs Marge — sources payantes
+  const hideZ_bm = HIDE_ZERO['c-bm'];
+  let bmR = [...rows].filter(r => r.type === 'payant');
+  if (hideZ_bm) bmR = bmR.filter(r => r.ca > 0);
+  bmR.sort((a, b) => b.budget - a.budget);
+  if (bmR.length > 0) {
+    const bmH = Math.max(180, bmR.length * 40);
+    document.getElementById('c-bm').parentElement.style.height = bmH + 'px';
+    makeGroupBar('c-bm', bmR.map(r => r.source), [
+      { label: 'Budget', data: bmR.map(r => r.budget), backgroundColor: bmR.map(r => SOURCE_COLORS[r.source] + 'aa'), borderRadius: 4 },
+      { label: 'Marge',  data: bmR.map(r => r.marge),  backgroundColor: bmR.map(r => SOURCE_COLORS[r.source]),         borderRadius: 4 },
+    ]);
+  }
+
+  // 5. Taux validés (CV → Candidat)
+  drawHBar('c-tx-cand', rows, 'tx_new_cand', { pct: true });
+
+  // 6. % Nouveaux intérimaires
+  drawHBar('c-nint', rows, 'pct_n_int', { pct: true });
+
+  // 7. CA par source
+  drawHBar('c-ca', rows, 'ca', { eur: true });
+  document.getElementById('b-ca').textContent = f.keur(sum(rows,'ca')) + ' total';
+
+  // 8. Évolution mensuelle (si plusieurs mois)
+  const mKeys = Object.keys(STATS_DATA).sort();
+  if (mKeys.length > 1) {
+    document.getElementById('evo-section').style.display = 'block';
+    document.getElementById('sel-evo').onchange = updateEvo;
+    updateEvo();
+  }
+}
+
+function updateEvo() {
+  const metric = document.getElementById('sel-evo').value;
+  const mKeys  = Object.keys(STATS_DATA).sort();
+  const labels = mKeys.map(k => STATS_DATA[k].label);
+
+  // Top 6 sources du dernier mois sur la métrique
+  const latest = STATS_DATA[mKeys.at(-1)].rows;
+  const topSrc = [...latest]
+    .filter(r => gType === 'all' || r.type === gType)
+    .sort((a,b) => (b[metric]||0) - (a[metric]||0))
+    .slice(0, 6)
+    .map(r => r.source);
+
+  const datasets = topSrc.map((src) => ({
+    label: src,
+    data: mKeys.map(k => {
+      const r = STATS_DATA[k].rows.find(r => r.source === src);
+      return r ? (r[metric] || 0) : 0;
+    }),
+    borderColor: SOURCE_COLORS[src] || '#999',
+    backgroundColor: (SOURCE_COLORS[src] || '#999') + '22',
+    tension: 0.35,
+    fill: false,
+    pointRadius: 4,
+    pointHoverRadius: 6,
+  }));
+
+  if (CH['c-evo']) CH['c-evo'].destroy();
+  const ctx = document.getElementById('c-evo').getContext('2d');
+  CH['c-evo'] = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// ─── Tableau ───────────────────────────────────────────────────
+const COLS = ['source','budget','nb_cv','candidat_uniq','new_cand','tx_new_cand',
+              'cpnc','nb_int','tx_emploi','cme','n_int','pct_n_int',
+              'ca','roi_brut','marge','pct_marge','roi_reel'];
+
+function doSort(col) {
+  if (gSortCol === col) gSortAsc = !gSortAsc;
+  else { gSortCol = col; gSortAsc = false; }
+  document.querySelectorAll('thead th').forEach((th, i) => {
+    th.classList.remove('sorted','asc');
+    if (COLS[i] === gSortCol) {
+      th.classList.add('sorted');
+      if (gSortAsc) th.classList.add('asc');
+    }
+  });
+  updateTable();
+}
+
+function isZero(r) {
+  return r.nb_cv === 0 && r.nb_int === 0 && r.ca === 0;
+}
+
+function updateTable() {
+  const rows    = getData();
+  const hideZ   = document.getElementById('hide-zero').checked;
+  const sorted  = [...rows].sort((a,b) => {
+    const av = a[gSortCol] ?? -Infinity;
+    const bv = b[gSortCol] ?? -Infinity;
+    if (typeof av === 'string') return gSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+    return gSortAsc ? av - bv : bv - av;
+  });
+
+  const tbody = document.getElementById('tbl-body');
+  tbody.innerHTML = '';
+
+  sorted.forEach(r => {
+    const z = isZero(r);
+    if (z && hideZ) return;   // masqué
+    const tr = document.createElement('tr');
+    if (z) tr.classList.add('zero-row');
+
+    const roiCls = r.roi_reel == null ? 'dim'
+                 : r.roi_reel >= 1   ? 'pos'
+                 : r.roi_reel >= 0   ? ''
+                 : 'neg';
+
+    const fmtRoi = v => {
+      if (v == null) return `<span class="dim">—</span>`;
+      if (v === -1)  return `<span class="neg">−1×</span>`;
+      return `<span class="${v >= 1 ? 'pos' : v < 0 ? 'neg' : ''}">${f.x(v)}</span>`;
+    };
+
+    tr.innerHTML = `
+      <td><span class="src-name">${r.source}</span>
+          <span class="typ-badge ${r.type==='payant'?'typ-p':'typ-g'}">${r.type}</span></td>
+      <td>${r.budget > 0 ? f.eur(r.budget) : '<span class="dim">—</span>'}</td>
+      <td>${f.n(r.nb_cv)}</td>
+      <td>${f.n(r.candidat_uniq)}</td>
+      <td>${f.n(r.new_cand)}</td>
+      <td>${f.pct(r.tx_new_cand)}</td>
+      <td>${r.cpnc != null ? f.eur2(r.cpnc) : '<span class="dim">—</span>'}</td>
+      <td>${f.n(r.nb_int)}</td>
+      <td>${f.pct(r.tx_emploi)}</td>
+      <td>${r.cme != null ? f.eur2(r.cme) : '<span class="dim">—</span>'}</td>
+      <td>${f.n(r.n_int)}</td>
+      <td>${f.pct(r.pct_n_int)}</td>
+      <td>${f.eur(r.ca)}</td>
+      <td>${fmtRoi(r.roi_brut)}</td>
+      <td>${f.eur(r.marge)}</td>
+      <td>${f.pct(r.pct_marge)}</td>
+      <td class="${roiCls}">${fmtRoi(r.roi_reel)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Ligne totaux
+  const visible = sorted.filter(r => !(isZero(r) && hideZ));
+  const tCV   = sum(rows,'nb_cv'), tCU = sum(rows,'candidat_uniq');
+  const tCand = sum(rows,'new_cand'), tInt = sum(rows,'nb_int');
+  const tNint = sum(rows,'n_int'), tBud = sum(rows,'budget');
+  const tCA   = sum(rows,'ca'), tMar = sum(rows,'marge');
+  const sumTr = document.createElement('tr');
+  sumTr.className = 'total-row';
+  sumTr.innerHTML = `
+    <td>Total (${visible.length} sources)</td>
+    <td>${tBud > 0 ? f.eur(tBud) : '—'}</td>
+    <td>${f.n(tCV)}</td>
+    <td>${f.n(tCU)}</td>
+    <td>${f.n(tCand)}</td>
+    <td>${tCV > 0 ? f.pct(tCand/tCV) : '—'}</td>
+    <td>—</td>
+    <td>${f.n(tInt)}</td>
+    <td>${tCU > 0 ? f.pct(tInt/tCU) : '—'}</td>
+    <td>—</td>
+    <td>${f.n(tNint)}</td>
+    <td>${tInt > 0 ? f.pct(tNint/tInt) : '—'}</td>
+    <td>${f.eur(tCA)}</td>
+    <td>${tBud > 0 ? f.x(tCA/tBud) : '—'}</td>
+    <td>${f.eur(tMar)}</td>
+    <td>${tCA > 0 ? f.pct(tMar/tCA) : '—'}</td>
+    <td>${tBud > 0 ? f.x(tMar/tBud) : '—'}</td>
+  `;
+  tbody.appendChild(sumTr);
+
+  document.getElementById('b-tbl').textContent = `${visible.length} / ${rows.length} sources`;
+}
+
+// ─── Rendu global ──────────────────────────────────────────────
+function render() {
+  updateKPIs();
+  updateCharts();
+  updateTable();
+}
+
+// ─── Init ──────────────────────────────────────────────────────
+buildColorMap();
+initMonthSel();
+render();
+</script>
+</body>
+</html>
