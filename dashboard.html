@@ -82,6 +82,69 @@
       flex-wrap: wrap;
     }
 
+    /* ── HEADER MOBILE ───────────────────────────────────────── */
+    .hdr-menu-btn {
+      display: none;
+      border: 1.5px solid rgba(255,255,255,.4);
+      border-radius: 8px;
+      background: transparent;
+      color: #fff;
+      padding: 5px 11px;
+      font-size: 17px;
+      line-height: 1;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+
+    @media (max-width: 640px) {
+      header {
+        padding: 10px 14px;
+        flex-wrap: wrap;
+        gap: 0;
+        align-items: center;
+      }
+      .hdr-title        { flex: 1 1 auto; }
+      .hdr-title h1     { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .hdr-title p      { display: none; }
+      .hdr-menu-btn     { display: block; }
+      .hdr-controls {
+        display: none;
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255,255,255,.2);
+        margin-top: 10px;
+      }
+      .hdr-controls.open { display: flex; }
+      .hdr-controls .ctrl { flex-wrap: wrap; }
+      .btn-dark { padding: 5px 12px; font-size: 12px; }
+
+      /* ── Main padding ── */
+      main { padding: 12px; }
+
+      /* ── Grids responsive ── */
+      .grid-2 { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr; }
+
+      /* ── Vis-bar scroll ── */
+      .vis-bar { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 8px; gap: 5px; }
+      .vis-bar .vis-label { display: none; }
+
+      /* ── Jobboard cards ── */
+      .jb-card { flex: 0 0 200px; }
+
+      /* ── Card header ── */
+      .card-hdr {
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .card-ttl { flex: 1 1 100%; }
+      .chart-toggle { font-size: 10px; padding: 3px 8px; }
+    }
+
     .ctrl { display: flex; align-items: center; gap: 7px; }
     .ctrl-lbl { font-size: 11.5px; opacity: .8; white-space: nowrap; }
 
@@ -427,7 +490,8 @@
     <h1>📊 Dashboard Candidatures</h1>
     <p>RAS Intérim — Statistiques de recrutement par jobboard</p>
   </div>
-  <div class="hdr-controls">
+  <button class="hdr-menu-btn" onclick="toggleHdrMenu()" id="hdr-menu-btn" aria-label="Menu">&#9776;</button>
+  <div class="hdr-controls" id="hdr-controls">
     <div class="ctrl">
       <span class="ctrl-lbl">Période</span>
       <select class="hdr-sel" id="sel-month"></select>
@@ -646,6 +710,14 @@
 
 <!-- ═══ SCRIPT ═══════════════════════════════════════════════════ -->
 <script>
+// ─── Header mobile ─────────────────────────────────────────────
+function toggleHdrMenu() {
+  const ctrl = document.getElementById('hdr-controls');
+  const btn  = document.getElementById('hdr-menu-btn');
+  const open = ctrl.classList.toggle('open');
+  btn.innerHTML = open ? '&#x2715;' : '&#9776;';
+}
+
 // ─── Dark mode ─────────────────────────────────────────────────
 function isDark() { return document.body.classList.contains('dark'); }
 function chartGrid()  { return isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'; }
@@ -733,20 +805,45 @@ function buildColorMap() {
 // ─── Visibilité des charts ──────────────────────────────────────
 const CHART_CARDS = ['card-cv','card-int','card-roi','card-bm','card-tx','card-nint','card-ca'];
 
+function saveChartVisibility() {
+  const state = {};
+  CHART_CARDS.forEach(id => {
+    state[id] = document.getElementById(id).style.display !== 'none';
+  });
+  localStorage.setItem('dashboard-charts-vis', JSON.stringify(state));
+}
+
+function loadChartVisibility() {
+  try {
+    const state = JSON.parse(localStorage.getItem('dashboard-charts-vis'));
+    if (!state) return;
+    CHART_CARDS.forEach(id => {
+      const visible = state[id] !== false;
+      document.getElementById(id).style.display = visible ? '' : 'none';
+      document.getElementById('vis-' + id).classList.toggle('active', visible);
+    });
+    ['grid-row1','grid-row2','grid-row3'].forEach(gridId => {
+      const grid = document.getElementById(gridId);
+      if (!grid) return;
+      const allHidden = Array.from(grid.querySelectorAll('.card')).every(c => c.style.display === 'none');
+      grid.style.display = allHidden ? 'none' : '';
+    });
+  } catch(e) {}
+}
+
 function toggleChart(cardId) {
   const card = document.getElementById(cardId);
   const btn  = document.getElementById('vis-' + cardId);
   const willShow = card.style.display === 'none';
   card.style.display = willShow ? '' : 'none';
   btn.classList.toggle('active', willShow);
-  // Masquer le grid-row parent si tous ses enfants .card sont cachés
   ['grid-row1','grid-row2','grid-row3'].forEach(gridId => {
     const grid = document.getElementById(gridId);
     if (!grid) return;
-    const cards = grid.querySelectorAll('.card');
-    const allHidden = Array.from(cards).every(c => c.style.display === 'none');
+    const allHidden = Array.from(grid.querySelectorAll('.card')).every(c => c.style.display === 'none');
     grid.style.display = allHidden ? 'none' : '';
   });
+  saveChartVisibility();
   if (willShow) updateCharts();
 }
 
@@ -865,6 +962,7 @@ function makeHBar(id, labels, vals, colors, opts = {}) {
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { right: 8, top: 2, bottom: 2 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -907,8 +1005,9 @@ function makeGroupBar(id, labels, datasets) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { left: 4, right: 4, top: 4, bottom: 4 } },
       plugins: {
-        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } },
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12, color: chartTick() } },
         tooltip: {
           callbacks: {
             label: c => ` ${c.dataset.label} : ${f.eur(c.raw)}`
@@ -1346,6 +1445,7 @@ if (localStorage.getItem('dashboard-dark') === '1') {
 }
 buildColorMap();
 initMonthSel();
+loadChartVisibility();
 render();
 </script>
 </body>
