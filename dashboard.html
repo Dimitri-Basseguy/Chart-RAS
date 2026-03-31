@@ -277,6 +277,88 @@
     .neg { color: var(--red);   font-weight: 600; }
     .dim { color: var(--muted); }
 
+    /* ── JOBBOARD CARDS ─────────────────────────────────────── */
+    .jb-section {
+      margin-bottom: 15px;
+    }
+    .jb-section-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      padding: 0 2px;
+    }
+    .jb-row {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .jb-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border-top: 4px solid var(--border);
+      flex: 0 0 230px;
+      padding: 14px 16px;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .jb-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.1); }
+    .jb-card.roi-green  { border-top-color: var(--green); }
+    .jb-card.roi-amber  { border-top-color: var(--amber); }
+    .jb-card.roi-red    { border-top-color: var(--red); }
+    .jb-card.roi-none   { border-top-color: var(--muted); }
+
+    .jb-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 11px;
+      gap: 6px;
+    }
+    .jb-name {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .jb-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .jb-roi {
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .jb-roi.green { color: var(--green); }
+    .jb-roi.amber { color: var(--amber); }
+    .jb-roi.red   { color: var(--red); }
+    .jb-roi.dim   { color: var(--muted); }
+
+    .jb-metrics { display: flex; flex-direction: column; gap: 5px; }
+    .jb-metric {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      gap: 6px;
+    }
+    .jb-metric-lbl { color: var(--muted); white-space: nowrap; }
+    .jb-metric-val { font-weight: 600; color: var(--text); text-align: right; }
+
+    .jb-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 7px 0;
+    }
+
     /* ── CHART TOGGLE ────────────────────────────────────────── */
     .chart-toggle {
       border: 1px solid var(--border);
@@ -364,6 +446,18 @@
       <div class="kpi-val" id="k-marge">—</div>
       <div class="kpi-sub" id="k-marge-s"></div>
     </div>
+  </div>
+
+  <!-- Jobboards payants -->
+  <div class="jb-section">
+    <div class="jb-section-hdr">
+      <span class="card-ttl">Jobboards payants</span>
+      <label class="tbl-toggle">
+        <input type="checkbox" id="jb-hide-zero" checked onchange="updateJBCards()">
+        Masquer inactifs
+      </label>
+    </div>
+    <div class="jb-row" id="jb-row"></div>
   </div>
 
   <!-- Barre visibilité charts -->
@@ -1112,9 +1206,80 @@ function updateTable() {
   document.getElementById('b-tbl').textContent = `${visible.length} / ${rows.length} sources`;
 }
 
+// ─── Jobboard Cards ────────────────────────────────────────────
+function updateJBCards() {
+  const rows    = getData().filter(r => r.type === 'payant');
+  const hideZ   = document.getElementById('jb-hide-zero').checked;
+  const visible = hideZ ? rows.filter(r => r.budget > 0 || r.ca > 0) : rows;
+  const container = document.getElementById('jb-row');
+  container.innerHTML = '';
+
+  if (visible.length === 0) {
+    container.innerHTML = '<span style="color:var(--muted);font-size:12px;padding:8px 4px">Aucune source payante active.</span>';
+    return;
+  }
+
+  visible.sort((a, b) => (b.ca || 0) - (a.ca || 0)).forEach(r => {
+    const roi = r.roi_reel;
+    const roiCls  = roi == null || roi === -1 ? 'none'
+                  : roi >= 1   ? 'green'
+                  : roi >= 0   ? 'amber'
+                  : 'red';
+    const roiTxt  = roi == null ? '—'
+                  : roi === -1  ? '−1×'
+                  : (roi >= 0 ? '+' : '') + roi.toFixed(2) + '×';
+
+    const dot = SOURCE_COLORS[r.source] || '#999';
+
+    const card = document.createElement('div');
+    card.className = `jb-card roi-${roiCls}`;
+    card.innerHTML = `
+      <div class="jb-hdr">
+        <span class="jb-dot" style="background:${dot}"></span>
+        <span class="jb-name" title="${r.source}">${r.source}</span>
+        <span class="jb-roi ${roiCls}" title="ROI Marge">${roiTxt}</span>
+      </div>
+      <div class="jb-metrics">
+        <div class="jb-metric">
+          <span class="jb-metric-lbl">Budget</span>
+          <span class="jb-metric-val">${r.budget > 0 ? f.eur(r.budget) : '—'}</span>
+        </div>
+        <div class="jb-metric">
+          <span class="jb-metric-lbl">CVs reçus</span>
+          <span class="jb-metric-val">${f.n(r.nb_cv)}</span>
+        </div>
+        <div class="jb-metric">
+          <span class="jb-metric-lbl">% Nouv. cand.</span>
+          <span class="jb-metric-val">${f.pct(r.tx_new_cand)}</span>
+        </div>
+        <hr class="jb-divider">
+        <div class="jb-metric">
+          <span class="jb-metric-lbl">Intérimaires</span>
+          <span class="jb-metric-val">${f.n(r.nb_int)}</span>
+        </div>
+        <div class="jb-metric">
+          <span class="jb-metric-lbl">% Nouv. int.</span>
+          <span class="jb-metric-val">${f.pct(r.pct_n_int)}</span>
+        </div>
+        <hr class="jb-divider">
+        <div class="jb-metric">
+          <span class="jb-metric-lbl">CA</span>
+          <span class="jb-metric-val">${f.keur(r.ca)}</span>
+        </div>
+        <div class="jb-metric">
+          <span class="jb-metric-lbl">Marge</span>
+          <span class="jb-metric-val">${f.keur(r.marge)}</span>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
 // ─── Rendu global ──────────────────────────────────────────────
 function render() {
   updateKPIs();
+  updateJBCards();
   updateCharts();
   updateTable();
 }
