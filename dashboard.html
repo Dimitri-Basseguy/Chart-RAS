@@ -1094,14 +1094,18 @@ function toggleEvoSource(src) {
 }
 
 function setEvoMode(mode) {
-  gEvoMode = mode;
   if (mode === 'top8') {
+    gEvoMode = 'top8';
     gEvoSources = new Set(getTopSources(8));
   } else {
-    gEvoSources = new Set(getAllEvoSources());
+    // "Toutes" toggle : si tout est sélectionné → tout désélectionner
+    const all = getAllEvoSources();
+    const allSelected = all.every(s => gEvoSources.has(s));
+    gEvoMode = allSelected ? 'none' : 'all';
+    gEvoSources = allSelected ? new Set() : new Set(all);
   }
-  document.getElementById('evo-btn-top8').classList.toggle('active', mode === 'top8');
-  document.getElementById('evo-btn-all').classList.toggle('active',  mode === 'all');
+  document.getElementById('evo-btn-top8').classList.toggle('active', gEvoMode === 'top8');
+  document.getElementById('evo-btn-all').classList.toggle('active',  gEvoMode === 'all');
   syncEvoPills();
   updateEvo();
 }
