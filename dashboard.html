@@ -366,9 +366,21 @@
     </div>
   </div>
 
+  <!-- Barre visibilité charts -->
+  <div class="vis-bar">
+    <span class="vis-label">Afficher :</span>
+    <button class="vis-btn active" id="vis-card-cv"   onclick="toggleChart('card-cv')">CVs reçus</button>
+    <button class="vis-btn active" id="vis-card-int"  onclick="toggleChart('card-int')">Intérimaires</button>
+    <button class="vis-btn active" id="vis-card-roi"  onclick="toggleChart('card-roi')">ROI Marge</button>
+    <button class="vis-btn active" id="vis-card-bm"   onclick="toggleChart('card-bm')">Budget/Marge</button>
+    <button class="vis-btn active" id="vis-card-tx"   onclick="toggleChart('card-tx')">Taux Nouv.</button>
+    <button class="vis-btn active" id="vis-card-nint" onclick="toggleChart('card-nint')">% nINT</button>
+    <button class="vis-btn active" id="vis-card-ca"   onclick="toggleChart('card-ca')">CA source</button>
+  </div>
+
   <!-- Charts row 1 : CVs + Intérimaires -->
-  <div class="grid-2">
-    <div class="card" style="margin-bottom:0">
+  <div class="grid-2" id="grid-row1">
+    <div class="card" id="card-cv" style="margin-bottom:0">
       <div class="card-hdr">
         <span class="card-ttl">CVs reçus par source</span>
         <button class="chart-toggle" id="tog-cv" onclick="toggleZ('c-cv','tog-cv')">Masquer inactives</button>
@@ -376,7 +388,7 @@
       </div>
       <div class="chart-box"><canvas id="c-cv"></canvas></div>
     </div>
-    <div class="card" style="margin-bottom:0">
+    <div class="card" id="card-int" style="margin-bottom:0">
       <div class="card-hdr">
         <span class="card-ttl">Intérimaires placés par source</span>
         <button class="chart-toggle" id="tog-int" onclick="toggleZ('c-int','tog-int')">Masquer inactives</button>
@@ -387,8 +399,8 @@
   </div>
 
   <!-- Charts row 2 : ROI + Budget/Marge -->
-  <div class="grid-2">
-    <div class="card" style="margin-bottom:0">
+  <div class="grid-2" id="grid-row2">
+    <div class="card" id="card-roi" style="margin-bottom:0">
       <div class="card-hdr">
         <span class="card-ttl">ROI Réel Marge — sources payantes</span>
         <button class="chart-toggle" id="tog-roi" onclick="toggleZ('c-roi','tog-roi')">Masquer inactives</button>
@@ -396,7 +408,7 @@
       </div>
       <div class="chart-box"><canvas id="c-roi"></canvas></div>
     </div>
-    <div class="card" style="margin-bottom:0">
+    <div class="card" id="card-bm" style="margin-bottom:0">
       <div class="card-hdr">
         <span class="card-ttl">Budget vs Marge — sources payantes</span>
         <button class="chart-toggle" id="tog-bm" onclick="toggleZ('c-bm','tog-bm')">Masquer inactives</button>
@@ -407,8 +419,8 @@
   </div>
 
   <!-- Charts row 3 : Taux de transformation -->
-  <div class="grid-3">
-    <div class="card" style="margin-bottom:0">
+  <div class="grid-3" id="grid-row3">
+    <div class="card" id="card-tx" style="margin-bottom:0">
       <div class="card-hdr">
         <span class="card-ttl">Taux Nouveaux (CV → Cand.)</span>
         <button class="chart-toggle" id="tog-tx" onclick="toggleZ('c-tx-cand','tog-tx')">Masquer inactives</button>
@@ -416,7 +428,7 @@
       </div>
       <div class="chart-box"><canvas id="c-tx-cand"></canvas></div>
     </div>
-    <div class="card" style="margin-bottom:0">
+    <div class="card" id="card-nint" style="margin-bottom:0">
       <div class="card-hdr">
         <span class="card-ttl">% Nouveaux intérimaires (nINT)</span>
         <button class="chart-toggle" id="tog-nint" onclick="toggleZ('c-nint','tog-nint')">Masquer inactives</button>
@@ -424,7 +436,7 @@
       </div>
       <div class="chart-box"><canvas id="c-nint"></canvas></div>
     </div>
-    <div class="card" style="margin-bottom:0">
+    <div class="card" id="card-ca" style="margin-bottom:0">
       <div class="card-hdr">
         <span class="card-ttl">CA par source</span>
         <button class="chart-toggle" id="tog-ca" onclick="toggleZ('c-ca','tog-ca')">Masquer inactives</button>
@@ -439,15 +451,21 @@
     <div class="card">
       <div class="card-hdr">
         <span class="card-ttl">Évolution mensuelle</span>
-        <select id="sel-evo" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);background:#fff;cursor:pointer;">
-          <option value="nb_cv">CVs reçus</option>
-          <option value="new_cand">Candidats Nouveaux</option>
-          <option value="nb_int">Intérimaires placés</option>
-          <option value="ca">CA Total</option>
-          <option value="marge">Marge</option>
-          <option value="budget">Budget</option>
-        </select>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <select id="sel-evo" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);background:#fff;cursor:pointer;">
+            <option value="nb_cv">CVs reçus</option>
+            <option value="new_cand">Candidats Nouveaux</option>
+            <option value="nb_int">Intérimaires placés</option>
+            <option value="ca">CA Total</option>
+            <option value="marge">Marge</option>
+          </select>
+          <div style="display:flex;gap:4px;">
+            <button id="evo-btn-top8" class="vis-btn active" onclick="setEvoMode('top8')">Top 8</button>
+            <button id="evo-btn-all"  class="vis-btn"        onclick="setEvoMode('all')">Toutes</button>
+          </div>
+        </div>
       </div>
+      <div id="evo-src-bar" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;"></div>
       <div class="chart-box tall"><canvas id="c-evo"></canvas></div>
     </div>
   </div>
@@ -565,6 +583,26 @@ function buildColorMap() {
     m.rows.forEach(r => { if (!seen.includes(r.source)) seen.push(r.source); })
   );
   seen.forEach((s, i) => { SOURCE_COLORS[s] = PAL[i % PAL.length]; });
+}
+
+// ─── Visibilité des charts ──────────────────────────────────────
+const CHART_CARDS = ['card-cv','card-int','card-roi','card-bm','card-tx','card-nint','card-ca'];
+
+function toggleChart(cardId) {
+  const card = document.getElementById(cardId);
+  const btn  = document.getElementById('vis-' + cardId);
+  const willShow = card.style.display === 'none';
+  card.style.display = willShow ? '' : 'none';
+  btn.classList.toggle('active', willShow);
+  // Masquer le grid-row parent si tous ses enfants .card sont cachés
+  ['grid-row1','grid-row2','grid-row3'].forEach(gridId => {
+    const grid = document.getElementById(gridId);
+    if (!grid) return;
+    const cards = grid.querySelectorAll('.card');
+    const allHidden = Array.from(cards).every(c => c.style.display === 'none');
+    grid.style.display = allHidden ? 'none' : '';
+  });
+  if (willShow) updateCharts();
 }
 
 // ─── État masquer inactives (par chart) ────────────────────────
@@ -743,6 +781,39 @@ function makeGroupBar(id, labels, datasets) {
   });
 }
 
+function makePolarArea(id, labels, vals, colors) {
+  if (CH[id]) CH[id].destroy();
+  document.getElementById(id).parentElement.style.height = '380px';
+  const ctx = document.getElementById(id).getContext('2d');
+  const total = vals.reduce((a, v) => a + v, 0);
+  CH[id] = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        backgroundColor: colors.map(c => c + 'cc'),
+        borderColor: '#fff',
+        borderWidth: 2,
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: 8 },
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 11, padding: 8 } },
+        tooltip: {
+          callbacks: {
+            label: c => ` ${c.label} : ${c.raw.toLocaleString('fr-FR')} CVs (${(c.raw/total*100).toFixed(1)} %)`
+          }
+        }
+      }
+    }
+  });
+}
+
 // Dessine un bar chart horizontal avec couleurs par source + hauteur dynamique
 function drawHBar(id, rows, valueKey, opts = {}) {
   const hideZ = HIDE_ZERO[id];
@@ -760,9 +831,13 @@ function drawHBar(id, rows, valueKey, opts = {}) {
 function updateCharts() {
   const rows = getData();
 
-  // 1. CVs par source — toutes sources
-  drawHBar('c-cv', rows, 'nb_cv');
-  document.getElementById('b-cv').textContent = f.n(sum(rows,'nb_cv')) + ' total';
+  // 1. CVs par source — polar area
+  {
+    let cvRows = [...rows].sort((a, b) => (b.nb_cv || 0) - (a.nb_cv || 0));
+    if (HIDE_ZERO['c-cv']) cvRows = cvRows.filter(r => (r.nb_cv || 0) > 0);
+    makePolarArea('c-cv', cvRows.map(r => r.source), cvRows.map(r => r.nb_cv || 0), cvRows.map(r => SOURCE_COLORS[r.source] || '#999'));
+    document.getElementById('b-cv').textContent = f.n(sum(rows,'nb_cv')) + ' total';
+  }
 
   // 2. Intérimaires par source — toutes sources
   drawHBar('c-int', rows, 'nb_int');
@@ -812,9 +887,85 @@ function updateCharts() {
   const mKeys = Object.keys(STATS_DATA).sort();
   if (mKeys.length > 1) {
     document.getElementById('evo-section').style.display = 'block';
-    document.getElementById('sel-evo').onchange = updateEvo;
+    document.getElementById('sel-evo').onchange = () => {
+      if (gEvoMode === 'top8') gEvoSources = new Set(getTopSources(8));
+      syncEvoPills();
+      updateEvo();
+    };
+    // Init pills une seule fois
+    if (document.getElementById('evo-src-bar').children.length === 0) {
+      gEvoSources = new Set(getTopSources(8));
+      initEvoPills();
+    }
     updateEvo();
   }
+}
+
+// ─── Évolution : état sélection sources ───────────────────────
+let gEvoSources = new Set();
+let gEvoMode    = 'top8';
+
+function getAllEvoSources() {
+  const seen = new Set();
+  Object.values(STATS_DATA).forEach(m => m.rows.forEach(r => seen.add(r.source)));
+  return [...seen];
+}
+
+function getTopSources(n) {
+  const metric = document.getElementById('sel-evo').value;
+  const mKeys  = Object.keys(STATS_DATA).sort();
+  const latest = STATS_DATA[mKeys.at(-1)].rows;
+  return [...latest]
+    .filter(r => gType === 'all' || r.type === gType)
+    .sort((a, b) => (b[metric] || 0) - (a[metric] || 0))
+    .slice(0, n)
+    .map(r => r.source);
+}
+
+function initEvoPills() {
+  const bar  = document.getElementById('evo-src-bar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  const all = getAllEvoSources().sort((a, b) => a.localeCompare(b));
+  all.forEach(src => {
+    const btn = document.createElement('button');
+    btn.className   = 'vis-btn' + (gEvoSources.has(src) ? ' active' : '');
+    btn.id          = 'evo-src-' + src.replace(/\W/g, '_');
+    btn.textContent = src;
+    btn.style.borderLeftColor = SOURCE_COLORS[src] || '#999';
+    btn.onclick = () => toggleEvoSource(src);
+    bar.appendChild(btn);
+  });
+}
+
+function toggleEvoSource(src) {
+  if (gEvoSources.has(src)) { gEvoSources.delete(src); }
+  else                       { gEvoSources.add(src); }
+  gEvoMode = 'custom';
+  document.getElementById('evo-btn-top8').classList.remove('active');
+  document.getElementById('evo-btn-all').classList.remove('active');
+  syncEvoPills();
+  updateEvo();
+}
+
+function setEvoMode(mode) {
+  gEvoMode = mode;
+  if (mode === 'top8') {
+    gEvoSources = new Set(getTopSources(8));
+  } else {
+    gEvoSources = new Set(getAllEvoSources());
+  }
+  document.getElementById('evo-btn-top8').classList.toggle('active', mode === 'top8');
+  document.getElementById('evo-btn-all').classList.toggle('active',  mode === 'all');
+  syncEvoPills();
+  updateEvo();
+}
+
+function syncEvoPills() {
+  getAllEvoSources().forEach(src => {
+    const btn = document.getElementById('evo-src-' + src.replace(/\W/g, '_'));
+    if (btn) btn.classList.toggle('active', gEvoSources.has(src));
+  });
 }
 
 function updateEvo() {
@@ -822,15 +973,8 @@ function updateEvo() {
   const mKeys  = Object.keys(STATS_DATA).sort();
   const labels = mKeys.map(k => STATS_DATA[k].label);
 
-  // Top 6 sources du dernier mois sur la métrique
-  const latest = STATS_DATA[mKeys.at(-1)].rows;
-  const topSrc = [...latest]
-    .filter(r => gType === 'all' || r.type === gType)
-    .sort((a,b) => (b[metric]||0) - (a[metric]||0))
-    .slice(0, 6)
-    .map(r => r.source);
-
-  const datasets = topSrc.map((src) => ({
+  const sources = [...gEvoSources];
+  const datasets = sources.map(src => ({
     label: src,
     data: mKeys.map(k => {
       const r = STATS_DATA[k].rows.find(r => r.source === src);
