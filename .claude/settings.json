@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m pip install cryptography)",
+      "Bash(python3 -m pip install cryptography --break-system-packages)",
+      "Bash(python3 -c \"from cryptography.hazmat.primitives.ciphers.aead import AESGCM; print\\(''ok''\\)\")"
+    ]
+  }
+}

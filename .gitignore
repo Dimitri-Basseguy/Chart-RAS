@@ -1,2 +1,13 @@
 
 .DS_Store
+
+# Données sensibles — ne jamais committer
+data.js
+
+# Scripts locaux uniquement
+*.py
+
+# Python
+__pycache__/
+*.pyc
+.env

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard — Statistiques Candidatures</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-  <script src="data.js"></script>
+  <script src="data.enc.js"></script>
   <style>
     :root {
       --primary:     #1a3a5c;
@@ -480,9 +480,95 @@
 
     /* ── TOOLTIP HINT ────────────────────────────────────────── */
     abbr { text-decoration: underline dotted; cursor: help; }
+
+    /* ── MODALE MOT DE PASSE ─────────────────────────────────── */
+    #lock-overlay {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #0d1f38 0%, #1a3a5c 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    #lock-overlay.hidden { display: none; }
+
+    .lock-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.4);
+      text-align: center;
+    }
+    body.dark .lock-card {
+      background: #1e293b;
+    }
+    .lock-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a3a5c;
+      margin-bottom: 4px;
+    }
+    body.dark .lock-title { color: #e2e8f0; }
+    .lock-sub {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 24px;
+    }
+    .lock-input {
+      width: 100%;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 15px;
+      outline: none;
+      margin-bottom: 12px;
+      transition: border-color .15s;
+      background: #f8fafc;
+      color: #1e293b;
+    }
+    body.dark .lock-input {
+      background: #0f172a;
+      border-color: #334155;
+      color: #e2e8f0;
+    }
+    .lock-input:focus { border-color: #3b82f6; }
+    .lock-btn {
+      width: 100%;
+      padding: 11px;
+      background: linear-gradient(135deg, #1a3a5c 0%, #1e4d8c 100%);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .lock-btn:hover { opacity: .9; }
+    .lock-btn:disabled { opacity: .5; cursor: default; }
+    .lock-error {
+      font-size: 12px;
+      color: #ef4444;
+      margin-top: 10px;
+      min-height: 18px;
+    }
   </style>
 </head>
 <body>
+
+<!-- ═══ MODALE MOT DE PASSE ══════════════════════════════════════ -->
+<div id="lock-overlay">
+  <div class="lock-card">
+    <div class="lock-title">📊 Dashboard Candidatures</div>
+    <div class="lock-sub">RAS Intérim — accès protégé</div>
+    <input class="lock-input" type="password" id="lock-pwd" placeholder="Mot de passe" autocomplete="current-password">
+    <button class="lock-btn" id="lock-btn" onclick="unlock()">Déverrouiller</button>
+    <div class="lock-error" id="lock-error"></div>
+  </div>
+</div>
 
 <!-- ═══ HEADER ══════════════════════════════════════════════════ -->
 <header>
@@ -1438,15 +1524,83 @@ function render() {
   updateTable();
 }
 
-// ─── Init ──────────────────────────────────────────────────────
-if (localStorage.getItem('dashboard-dark') === '1') {
-  document.body.classList.add('dark');
-  document.getElementById('btn-dark').textContent = 'Clair';
+// ─── Déchiffrement AES-256-GCM ─────────────────────────────────
+async function deriveKey(password, salt) {
+  const keyMat = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password),
+    { name: 'PBKDF2' }, false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 200000, hash: 'SHA-256' },
+    keyMat,
+    { name: 'AES-GCM', length: 256 },
+    false, ['decrypt']
+  );
 }
-buildColorMap();
-initMonthSel();
-loadChartVisibility();
-render();
+
+async function decryptData(password, b64) {
+  const raw  = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const salt = raw.slice(0, 16);
+  const iv   = raw.slice(16, 28);
+  const ct   = raw.slice(28);
+  const key  = await deriveKey(password, salt);
+  const dec  = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  return new TextDecoder().decode(dec);
+}
+
+async function unlock() {
+  const pwd = document.getElementById('lock-pwd').value;
+  const btn = document.getElementById('lock-btn');
+  const err = document.getElementById('lock-error');
+  if (!pwd) return;
+  btn.disabled = true;
+  btn.textContent = 'Déchiffrement…';
+  err.textContent = '';
+  try {
+    const js = await decryptData(pwd, ENCRYPTED_DATA);
+    // Injecter STATS_DATA dans le scope global
+    window.STATS_DATA = (new Function(js + '\nreturn STATS_DATA;'))();
+    sessionStorage.setItem('dashboard-pwd', pwd);
+    document.getElementById('lock-overlay').classList.add('hidden');
+    initDashboard();
+  } catch {
+    err.textContent = 'Mot de passe incorrect.';
+    btn.disabled = false;
+    btn.textContent = 'Déverrouiller';
+    document.getElementById('lock-pwd').focus();
+  }
+}
+
+function initDashboard() {
+  if (localStorage.getItem('dashboard-dark') === '1') {
+    document.body.classList.add('dark');
+    document.getElementById('btn-dark').textContent = 'Clair';
+  }
+  buildColorMap();
+  initMonthSel();
+  loadChartVisibility();
+  render();
+}
+
+// ─── Init ──────────────────────────────────────────────────────
+document.getElementById('lock-pwd').addEventListener('keydown', e => {
+  if (e.key === 'Enter') unlock();
+});
+
+// Tentative auto si mot de passe en session
+(async () => {
+  const saved = sessionStorage.getItem('dashboard-pwd');
+  if (saved) {
+    try {
+      const js = await decryptData(saved, ENCRYPTED_DATA);
+      (new Function(js))();
+      document.getElementById('lock-overlay').classList.add('hidden');
+      initDashboard();
+    } catch {
+      sessionStorage.removeItem('dashboard-pwd');
+    }
+  }
+})();
 </script>
 </body>
 </html>
