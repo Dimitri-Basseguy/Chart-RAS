@@ -25,6 +25,28 @@
       --radius:      12px;
       --shadow:      0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.06);
     }
+    body.dark {
+      --primary:   #3b82f6;
+      --primary-2: #2563eb;
+      --bg:        #0f172a;
+      --card:      #1e293b;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --border:    #334155;
+      --shadow:    0 1px 3px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+    }
+
+    body.dark header {
+      background: linear-gradient(135deg, #0d1f38 0%, #12294f 100%);
+    }
+
+    body.dark tbody tr:hover       { background: #273347; }
+    body.dark tbody tr.total-row   { background: #162032; }
+    body.dark tbody tr.zero-row    { opacity: .4; }
+    body.dark .badge               { background: #273347; color: var(--muted); }
+    body.dark select               { color-scheme: dark; }
+    body.dark #sel-evo             { background: var(--card); color: var(--text); border-color: var(--border); }
+
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
@@ -95,6 +117,21 @@
     }
     .btn-grp button.active { background: #fff; color: var(--primary); }
 
+    /* ── DARK TOGGLE ─────────────────────────────────────────── */
+    .btn-dark {
+      border: 1.5px solid rgba(255,255,255,.3);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      background: transparent;
+      color: rgba(255,255,255,.85);
+      cursor: pointer;
+      transition: all .18s;
+      white-space: nowrap;
+    }
+    .btn-dark:hover { background: rgba(255,255,255,.15); }
+
     /* ── MAIN ────────────────────────────────────────────────── */
     main { padding: 22px 28px; max-width: 1560px; margin: 0 auto; }
 
@@ -156,7 +193,7 @@
       padding: 4px 12px;
       font-size: 12px;
       font-weight: 500;
-      background: #fff;
+      background: var(--card);
       color: var(--muted);
       cursor: pointer;
       transition: all .15s;
@@ -367,7 +404,7 @@
       font-size: 11px;
       font-weight: 500;
       color: var(--muted);
-      background: #fff;
+      background: var(--card);
       cursor: pointer;
       transition: all .15s;
       white-space: nowrap;
@@ -408,6 +445,7 @@
         <button id="tog-global" onclick="toggleAllZ()">Masquer inactives</button>
       </div>
     </div>
+    <button class="btn-dark" id="btn-dark" onclick="toggleDark()">Sombre</button>
   </div>
 </header>
 
@@ -546,7 +584,7 @@
       <div class="card-hdr">
         <span class="card-ttl">Évolution mensuelle</span>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <select id="sel-evo" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);background:#fff;cursor:pointer;">
+          <select id="sel-evo" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);background:var(--card);cursor:pointer;">
             <option value="nb_cv">CVs reçus</option>
             <option value="new_cand">Candidats Nouveaux</option>
             <option value="nb_int">Intérimaires placés</option>
@@ -608,6 +646,19 @@
 
 <!-- ═══ SCRIPT ═══════════════════════════════════════════════════ -->
 <script>
+// ─── Dark mode ─────────────────────────────────────────────────
+function isDark() { return document.body.classList.contains('dark'); }
+function chartGrid()  { return isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'; }
+function chartTick()  { return isDark() ? '#94a3b8' : '#64748b'; }
+
+function toggleDark() {
+  document.body.classList.toggle('dark');
+  const on = isDark();
+  document.getElementById('btn-dark').textContent = on ? 'Clair' : 'Sombre';
+  localStorage.setItem('dashboard-dark', on ? '1' : '0');
+  render();
+}
+
 // ─── État global ───────────────────────────────────────────────
 let gMonth = 'all';
 let gType  = 'all';
@@ -830,9 +881,9 @@ function makeHBar(id, labels, vals, colors, opts = {}) {
       },
       scales: {
         x: {
-          grid: { color: 'rgba(0,0,0,0.05)' },
+          grid: { color: chartGrid() },
           ticks: {
-            font: { size: 10 },
+            font: { size: 10 }, color: chartTick(),
             callback: v => {
               if (opts.eur)  return v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v}€`;
               if (opts.pct)  return `${(v*100).toFixed(0)} %`;
@@ -841,7 +892,7 @@ function makeHBar(id, labels, vals, colors, opts = {}) {
             }
           }
         },
-        y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+        y: { grid: { display: false }, ticks: { font: { size: 11 }, color: chartTick() } }
       }
     }
   });
@@ -865,10 +916,10 @@ function makeGroupBar(id, labels, datasets) {
         }
       },
       scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 35 } },
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, color: chartTick(), maxRotation: 35 } },
         y: {
-          grid: { color: 'rgba(0,0,0,0.05)' },
-          ticks: { font: { size: 10 }, callback: v => v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v}€` }
+          grid: { color: chartGrid() },
+          ticks: { font: { size: 10 }, color: chartTick(), callback: v => v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v}€` }
         }
       }
     }
@@ -897,7 +948,7 @@ function makePolarArea(id, labels, vals, colors) {
       maintainAspectRatio: false,
       layout: { padding: 8 },
       plugins: {
-        legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 11, padding: 8 } },
+        legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 11, padding: 8, color: chartTick() } },
         tooltip: {
           callbacks: {
             label: c => ` ${c.label} : ${c.raw.toLocaleString('fr-FR')} CVs (${(c.raw/total*100).toFixed(1)} %)`
@@ -1090,10 +1141,10 @@ function updateEvo() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } } },
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12, color: chartTick() } } },
       scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-        y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 } } }
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: chartTick() } },
+        y: { grid: { color: chartGrid() }, ticks: { font: { size: 11 }, color: chartTick() } }
       }
     }
   });
@@ -1285,6 +1336,10 @@ function render() {
 }
 
 // ─── Init ──────────────────────────────────────────────────────
+if (localStorage.getItem('dashboard-dark') === '1') {
+  document.body.classList.add('dark');
+  document.getElementById('btn-dark').textContent = 'Clair';
+}
 buildColorMap();
 initMonthSel();
 render();
