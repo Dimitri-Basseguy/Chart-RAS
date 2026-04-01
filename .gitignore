@@ -3,9 +3,8 @@
 
 # Données sensibles — ne jamais committer
 data.js
-
-# Scripts locaux uniquement
-*.py
+agences.js
+*.xlsx
 
 # Python
 __pycache__/

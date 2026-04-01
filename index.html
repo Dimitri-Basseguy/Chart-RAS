@@ -7,6 +7,7 @@
   <title>Dashboard — Statistiques Candidatures</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <script src="data.enc.js"></script>
+  <script src="agences.enc.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -223,23 +224,86 @@
             <th onclick="doSort('source')">Source</th>
             <th onclick="doSort('budget')">Budget</th>
             <th onclick="doSort('nb_cv')">Nb CV</th>
-            <th onclick="doSort('candidat_uniq')">Cand. Uniq.</th>
-            <th onclick="doSort('new_cand')"><abbr title="Nouveaux candidats">Cand. Nouv.</abbr></th>
-            <th onclick="doSort('tx_new_cand')">Tx Nouv.</th>
-            <th onclick="doSort('cpnc')"><abbr title="Coût par nouveau candidat">CPNC</abbr></th>
+            <th onclick="doSort('candidat_uniq')">Cand. Uniq.<span class="th-help" onclick="showThTooltip(this,'Candidats uniques : nombre de candidats distincts ayant postulé via cette source',event)">?</span></th>
+            <th onclick="doSort('new_cand')">Cand. Nouv.<span class="th-help" onclick="showThTooltip(this,'Nouveaux candidats : candidats postulant pour la première fois',event)">?</span></th>
+            <th onclick="doSort('tx_new_cand')">Tx Nouv.<span class="th-help" onclick="showThTooltip(this,'Taux de nouveaux candidats : Cand. Nouv. ÷ Nb CV reçus',event)">?</span></th>
+            <th onclick="doSort('cpnc')">CPNC<span class="th-help" onclick="showThTooltip(this,'Coût par nouveau candidat : Budget ÷ Cand. Nouv.',event)">?</span></th>
             <th onclick="doSort('nb_int')">Nb Int.</th>
-            <th onclick="doSort('tx_emploi')">Tx Emploi</th>
-            <th onclick="doSort('cme')"><abbr title="Coût par mise à l'emploi">CME</abbr></th>
-            <th onclick="doSort('n_int')"><abbr title="Nouveaux intérimaires">nINT</abbr></th>
-            <th onclick="doSort('pct_n_int')">% nINT</th>
-            <th onclick="doSort('ca')">CA Total</th>
-            <th onclick="doSort('roi_brut')"><abbr title="ROI brut sur CA">ROI CA</abbr></th>
+            <th onclick="doSort('tx_emploi')">Tx Emploi<span class="th-help" onclick="showThTooltip(this,'Taux de mise à l\'emploi : Nb intérimaires ÷ Candidats uniques',event)">?</span></th>
+            <th onclick="doSort('cme')">CME<span class="th-help" onclick="showThTooltip(this,'Coût par mise à l\'emploi : Budget ÷ Nb intérimaires placés',event)">?</span></th>
+            <th onclick="doSort('n_int')">nINT<span class="th-help" onclick="showThTooltip(this,'Nouveaux intérimaires : intérimaires travaillant pour la première fois avec RAS',event)">?</span></th>
+            <th onclick="doSort('pct_n_int')">% nINT<span class="th-help" onclick="showThTooltip(this,'Part de nouveaux intérimaires : nINT ÷ Nb intérimaires (indicateur de fidélisation)',event)">?</span></th>
+            <th onclick="doSort('ca')">CA Total<span class="th-help" onclick="showThTooltip(this,'Chiffre d\'affaires total généré par les intérimaires placés via cette source',event)">?</span></th>
+            <th onclick="doSort('roi_brut')">ROI CA<span class="th-help" onclick="showThTooltip(this,'ROI brut : CA Total ÷ Budget — retour sur investissement avant déduction des coûts',event)">?</span></th>
             <th onclick="doSort('marge')">Marge</th>
-            <th onclick="doSort('pct_marge')">% Marge</th>
-            <th onclick="doSort('roi_reel')"><abbr title="ROI réel sur marge">ROI Marge</abbr></th>
+            <th onclick="doSort('pct_marge')">% Marge<span class="th-help" onclick="showThTooltip(this,'Taux de marge : Marge ÷ CA Total',event)">?</span></th>
+            <th onclick="doSort('roi_reel')">ROI Marge<span class="th-help" onclick="showThTooltip(this,'ROI réel : Marge ÷ Budget — retour sur investissement net, indicateur clé de rentabilité',event)">?</span></th>
           </tr>
         </thead>
         <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+
+  <!-- ══ AGENCES ══════════════════════════════════════════════════ -->
+  <div class="card" id="agences-section" style="display:none">
+    <div class="card-hdr">
+      <span class="card-ttl">Performances par agence</span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <select id="ag-region" onchange="updateAgencesSection()" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);background:var(--card);cursor:pointer;">
+          <option value="all">Toutes les régions</option>
+        </select>
+        <input id="ag-search" type="text" placeholder="Rechercher agence…" oninput="updateAgencesSection()"
+          style="border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text);background:var(--card);outline:none;width:180px;">
+        <span class="badge" id="b-ag">—</span>
+      </div>
+    </div>
+
+    <!-- KPIs agences -->
+    <div class="kpi-row" style="margin-bottom:16px">
+      <div class="kpi">
+        <div class="kpi-lbl">CVs reçus</div>
+        <div class="kpi-val" id="ag-k-cv">—</div>
+      </div>
+      <div class="kpi green">
+        <div class="kpi-lbl">Intérimaires</div>
+        <div class="kpi-val" id="ag-k-int">—</div>
+      </div>
+      <div class="kpi blue">
+        <div class="kpi-lbl">Nouv. intérimaires</div>
+        <div class="kpi-val" id="ag-k-nint">—</div>
+      </div>
+      <div class="kpi purple">
+        <div class="kpi-lbl">CA Total</div>
+        <div class="kpi-val" id="ag-k-ca">—</div>
+      </div>
+      <div class="kpi teal">
+        <div class="kpi-lbl">Marge Totale</div>
+        <div class="kpi-val" id="ag-k-marge">—</div>
+      </div>
+    </div>
+
+    <!-- Tableau agences -->
+    <div class="tbl-wrap">
+      <table id="ag-table" style="min-width:900px">
+        <thead>
+          <tr>
+            <th onclick="doAgSort('agence')">Agence</th>
+            <th onclick="doAgSort('region')">Région</th>
+            <th onclick="doAgSort('nb_cv')">CVs reçus</th>
+            <th onclick="doAgSort('pct_total')">% Total</th>
+            <th onclick="doAgSort('nb_int')">Intérimaires</th>
+            <th onclick="doAgSort('n_int')">Nouv. Int.</th>
+            <th onclick="doAgSort('pct_n_int')">% Nouv. Int.</th>
+            <th onclick="doAgSort('tx_emploi')">Tx Emploi<span class="th-help" onclick="showThTooltip(this,'Taux de mise à l\'emploi : nb intérimaires / nb candidats uniques',event)">?</span></th>
+            <th onclick="doAgSort('ca')">CA HRFA<span class="th-help" onclick="showThTooltip(this,'Chiffre d\'affaires hors frais d\'agence',event)">?</span></th>
+            <th onclick="doAgSort('marge')">Marge</th>
+            <th onclick="doAgSort('roi_marge')">ROI Marge<span class="th-help" onclick="showThTooltip(this,'Retour sur investissement : Marge ÷ Coût Prorata',event)">?</span></th>
+            <th onclick="doAgSort('cout_prorata')">Coût Prorata<span class="th-help" onclick="showThTooltip(this,'Coût = (Budget Beetween/12 + Budget Jobboard) × % CVs reçus par agence sur le total national',event)">?</span></th>
+          </tr>
+        </thead>
+        <tbody id="ag-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -285,7 +349,7 @@ const f = {
   keur: v => v == null ? '—' : v >= 1000 ? `${(v/1000).toFixed(0)} k€` : `${Math.round(v)} €`,
 };
 
-function sum(rows, key) { return rows.reduce((a, r) => a + (r[key] || 0), 0); }
+function sum(rows, key) { return rows.reduce((a, r) => a + (Number(r[key]) || 0), 0); }
 
 function getAggregatedData() {
   const sourceMap = {};
@@ -968,12 +1032,152 @@ function updateJBCards() {
   });
 }
 
+// ─── Agences ───────────────────────────────────────────────────
+let gAgSort    = 'ca';
+let gAgSortAsc = false;
+
+function getAgencesRows() {
+  if (!window.AGENCES_DATA) return [];
+  const months = gMonth === 'all' ? Object.keys(AGENCES_DATA) : (AGENCES_DATA[gMonth] ? [gMonth] : []);
+  const agMap = {};
+  months.forEach(mk => {
+    (AGENCES_DATA[mk]?.rows || []).forEach(r => {
+      if (!r.agence) return;
+      if (!agMap[r.agence]) {
+        agMap[r.agence] = { agence: r.agence, region: r.region, nb_cv: 0, nb_int: 0, n_int: 0, ca: 0, marge: 0, cout_prorata: 0, _tx_sum: 0, _count: 0 };
+      }
+      const a = agMap[r.agence];
+      a.nb_cv        += Number(r.nb_cv)        || 0;
+      a.nb_int       += Number(r.nb_int)       || 0;
+      a.n_int        += Number(r.n_int)        || 0;
+      a.ca           += Number(r.ca)           || 0;
+      a.marge        += Number(r.marge)        || 0;
+      a.cout_prorata += Number(r.cout_prorata) || 0;
+      a._tx_sum      += Number(r.tx_emploi)    || 0;
+      a._count++;
+    });
+  });
+  const totalCV = Object.values(agMap).reduce((s, a) => s + a.nb_cv, 0);
+  return Object.values(agMap).map(a => ({
+    ...a,
+    pct_total: totalCV > 0      ? a.nb_cv / totalCV   : null,
+    pct_n_int: a.nb_int > 0     ? a.n_int / a.nb_int  : null,
+    tx_emploi: a._count > 0     ? a._tx_sum / a._count : null,
+    roi_marge: a.cout_prorata > 0 ? a.marge / a.cout_prorata : null,
+  }));
+}
+
+function initAgenceRegions() {
+  if (!window.AGENCES_DATA) return;
+  const sel = document.getElementById('ag-region');
+  const regions = new Set();
+  Object.values(AGENCES_DATA).forEach(m => m.rows.forEach(r => { if (r.region) regions.add(r.region); }));
+  [...regions].sort().forEach(r => {
+    const o = document.createElement('option');
+    o.value = r; o.textContent = r;
+    sel.appendChild(o);
+  });
+}
+
+function doAgSort(col) {
+  if (gAgSort === col) gAgSortAsc = !gAgSortAsc;
+  else { gAgSort = col; gAgSortAsc = false; }
+  const cols = ['agence','region','nb_cv','pct_total','nb_int','n_int','pct_n_int','tx_emploi','ca','marge','roi_marge','cout_prorata'];
+  document.querySelectorAll('#ag-table thead th').forEach((th, i) => {
+    th.classList.remove('sorted','asc');
+    if (cols[i] === gAgSort) { th.classList.add('sorted'); if (gAgSortAsc) th.classList.add('asc'); }
+  });
+  updateAgencesSection();
+}
+
+function updateAgencesSection() {
+  const section = document.getElementById('agences-section');
+  if (!window.AGENCES_DATA) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  let rows = getAgencesRows();
+
+  // Filtre région
+  const region = document.getElementById('ag-region').value;
+  if (region !== 'all') rows = rows.filter(r => r.region === region);
+
+  // Filtre recherche
+  const q = document.getElementById('ag-search').value.trim().toLowerCase();
+  if (q) rows = rows.filter(r => r.agence.toLowerCase().includes(q));
+
+  // KPIs
+  const tCV    = rows.reduce((s, r) => s + (r.nb_cv  || 0), 0);
+  const tInt   = rows.reduce((s, r) => s + (r.nb_int || 0), 0);
+  const tNint  = rows.reduce((s, r) => s + (r.n_int  || 0), 0);
+  const tCA    = rows.reduce((s, r) => s + (r.ca     || 0), 0);
+  const tMarge = rows.reduce((s, r) => s + (r.marge  || 0), 0);
+
+  document.getElementById('ag-k-cv').textContent    = f.n(tCV);
+  document.getElementById('ag-k-int').textContent   = f.n(tInt);
+  document.getElementById('ag-k-nint').textContent  = f.n(tNint);
+  document.getElementById('ag-k-ca').textContent    = f.keur(tCA);
+  document.getElementById('ag-k-marge').textContent = f.keur(tMarge);
+  document.getElementById('b-ag').textContent       = rows.length + ' agences';
+
+  // Tri
+  const sorted = [...rows].sort((a, b) => {
+    const av = a[gAgSort] ?? -Infinity;
+    const bv = b[gAgSort] ?? -Infinity;
+    if (typeof av === 'string') return gAgSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+    return gAgSortAsc ? av - bv : bv - av;
+  });
+
+  // Tableau
+  const tbody = document.getElementById('ag-tbody');
+  tbody.innerHTML = '';
+  sorted.forEach(r => {
+    const roi    = r.roi_marge;
+    const roiCls = roi == null ? 'dim' : roi >= 2 ? 'pos' : roi >= 1 ? '' : 'neg';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="src-name">${r.agence}</span></td>
+      <td>${r.region || '—'}</td>
+      <td>${f.n(r.nb_cv)}</td>
+      <td>${f.pct(r.pct_total)}</td>
+      <td>${f.n(r.nb_int)}</td>
+      <td>${f.n(r.n_int)}</td>
+      <td>${f.pct(r.pct_n_int)}</td>
+      <td>${f.pct(r.tx_emploi)}</td>
+      <td>${f.keur(r.ca)}</td>
+      <td>${f.keur(r.marge)}</td>
+      <td class="${roiCls}">${roi != null ? f.x(roi) : '—'}</td>
+      <td>${r.cout_prorata > 0 ? f.eur(r.cout_prorata) : '—'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Ligne totaux
+  const totTr = document.createElement('tr');
+  totTr.className = 'total-row';
+  totTr.innerHTML = `
+    <td>Total (${sorted.length})</td>
+    <td>—</td>
+    <td>${f.n(tCV)}</td>
+    <td>100 %</td>
+    <td>${f.n(tInt)}</td>
+    <td>${f.n(tNint)}</td>
+    <td>${tInt > 0 ? f.pct(tNint / tInt) : '—'}</td>
+    <td>—</td>
+    <td>${f.keur(tCA)}</td>
+    <td>${f.keur(tMarge)}</td>
+    <td>—</td>
+    <td>—</td>
+  `;
+  tbody.appendChild(totTr);
+}
+
 // ─── Rendu global ──────────────────────────────────────────────
 function render() {
   updateKPIs();
   updateJBCards();
   updateCharts();
   updateTable();
+  updateAgencesSection();
 }
 
 // ─── Déchiffrement AES-256-GCM ─────────────────────────────────
@@ -1010,8 +1214,14 @@ async function unlock() {
   err.textContent = '';
   try {
     const js = await decryptData(pwd, ENCRYPTED_DATA);
-    // Injecter STATS_DATA dans le scope global
     window.STATS_DATA = (new Function(js + '\nreturn STATS_DATA;'))();
+    // Déchiffrer agences si disponible
+    if (typeof ENCRYPTED_AGENCES !== 'undefined') {
+      try {
+        const agJs = await decryptData(pwd, ENCRYPTED_AGENCES);
+        window.AGENCES_DATA = (new Function(agJs + '\nreturn AGENCES_DATA;'))();
+      } catch(e) { console.warn('Agences non déchiffrables', e); }
+    }
     sessionStorage.setItem('dashboard-pwd', pwd);
     document.getElementById('lock-overlay').classList.add('hidden');
     initDashboard();
@@ -1030,9 +1240,36 @@ function initDashboard() {
   }
   buildColorMap();
   initMonthSel();
+  initAgenceRegions();
   loadChartVisibility();
   render();
 }
+
+// ─── Tooltip en-têtes ──────────────────────────────────────────
+function showThTooltip(el, text, event) {
+  event.stopPropagation();
+  let tip = document.getElementById('th-tooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'th-tooltip';
+    document.body.appendChild(tip);
+  }
+  if (tip.style.display === 'block' && tip._src === el) {
+    tip.style.display = 'none';
+    tip._src = null;
+    return;
+  }
+  tip.textContent = text;
+  tip.style.display = 'block';
+  tip._src = el;
+  const r = el.getBoundingClientRect();
+  tip.style.top  = (r.bottom + 6) + 'px';
+  tip.style.left = Math.min(r.left, window.innerWidth - 295) + 'px';
+}
+document.addEventListener('click', () => {
+  const tip = document.getElementById('th-tooltip');
+  if (tip) tip.style.display = 'none';
+});
 
 // ─── Init ──────────────────────────────────────────────────────
 document.getElementById('lock-pwd').addEventListener('keydown', e => {
@@ -1045,7 +1282,13 @@ document.getElementById('lock-pwd').addEventListener('keydown', e => {
   if (saved) {
     try {
       const js = await decryptData(saved, ENCRYPTED_DATA);
-      (new Function(js))();
+      window.STATS_DATA = (new Function(js + '\nreturn STATS_DATA;'))();
+      if (typeof ENCRYPTED_AGENCES !== 'undefined') {
+        try {
+          const agJs = await decryptData(saved, ENCRYPTED_AGENCES);
+          window.AGENCES_DATA = (new Function(agJs + '\nreturn AGENCES_DATA;'))();
+        } catch(e) {}
+      }
       document.getElementById('lock-overlay').classList.add('hidden');
       initDashboard();
     } catch {

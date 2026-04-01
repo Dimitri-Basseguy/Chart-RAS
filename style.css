@@ -546,3 +546,41 @@
       margin-top: 10px;
       min-height: 18px;
     }
+
+    /* ── TOOLTIP EN-TÊTE ─────────────────────────────────────── */
+    .th-help {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.25);
+      font-size: 8.5px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-left: 5px;
+      vertical-align: middle;
+      flex-shrink: 0;
+      line-height: 1;
+      user-select: none;
+    }
+    .th-help:hover { background: rgba(255,255,255,.45); }
+
+    #th-tooltip {
+      position: fixed;
+      background: #1e293b;
+      color: #e2e8f0;
+      font-size: 12px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      max-width: 280px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.35);
+      z-index: 2000;
+      display: none;
+      line-height: 1.5;
+      pointer-events: none;
+    }
