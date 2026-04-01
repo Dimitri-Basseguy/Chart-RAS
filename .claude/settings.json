@@ -5,7 +5,10 @@
       "Bash(python3 -m pip install cryptography --break-system-packages)",
       "Bash(python3 -c \"from cryptography.hazmat.primitives.ciphers.aead import AESGCM; print\\(''ok''\\)\")",
       "Bash(python3 -c \":*)",
-      "Bash(python3 import_agences.py)"
+      "Bash(python3 import_agences.py)",
+      "Bash(grep -c '\"\"agence\"\"' data.js)",
+      "Bash(grep -n '\"\"agences\"\"' data.js)",
+      "Bash(grep -n '\"\"label\"\"' data.js)"
     ]
   }
 }

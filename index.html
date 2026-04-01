@@ -111,6 +111,7 @@
     <button class="vis-btn active" id="vis-card-tx"   onclick="toggleChart('card-tx')">Taux Nouv.</button>
     <button class="vis-btn active" id="vis-card-nint" onclick="toggleChart('card-nint')">% nINT</button>
     <button class="vis-btn active" id="vis-card-ca"   onclick="toggleChart('card-ca')">CA source</button>
+    <button class="vis-btn active" id="vis-card-ats"  onclick="toggleChart('card-ats')">Offres ATS</button>
   </div>
 
   <!-- Charts row 1 : CVs + Intérimaires -->
@@ -203,6 +204,15 @@
       <div id="evo-src-bar" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;"></div>
       <div class="chart-box tall"><canvas id="c-evo"></canvas></div>
     </div>
+  </div>
+
+  <!-- ATS : offres publiées N vs N-1 -->
+  <div id="card-ats" class="card" style="display:none">
+    <div class="card-hdr">
+      <span class="card-ttl">Offres publiées ATS — comparaison N vs N-1</span>
+      <span class="badge" id="b-ats">—</span>
+    </div>
+    <div class="chart-box" style="height:260px"><canvas id="c-ats"></canvas></div>
   </div>
 
   <!-- Tableau complet -->
@@ -300,7 +310,7 @@
             <th onclick="doAgSort('ca')">CA HRFA<span class="th-help" onclick="showThTooltip(this,'Chiffre d\'affaires hors frais d\'agence',event)">?</span></th>
             <th onclick="doAgSort('marge')">Marge</th>
             <th onclick="doAgSort('roi_marge')">ROI Marge<span class="th-help" onclick="showThTooltip(this,'Retour sur investissement : Marge ÷ Coût Prorata',event)">?</span></th>
-            <th onclick="doAgSort('cout_prorata')">Coût Prorata<span class="th-help" onclick="showThTooltip(this,'Coût = (Budget Beetween/12 + Budget Jobboard) × % CVs reçus par agence sur le total national',event)">?</span></th>
+            <th onclick="doAgSort('cout_prorata')">Coût Prorata<span class="th-help" onclick="showThTooltip(this,'Coût = (Budget Beetween mensuel/total agences + Budget Jobboard) × % CVs reçus par agence sur le total national',event)">?</span></th>
           </tr>
         </thead>
         <tbody id="ag-tbody"></tbody>
@@ -405,7 +415,7 @@ function buildColorMap() {
 }
 
 // ─── Visibilité des charts ──────────────────────────────────────
-const CHART_CARDS = ['card-cv','card-int','card-roi','card-bm','card-tx','card-nint','card-ca'];
+const CHART_CARDS = ['card-cv','card-int','card-roi','card-bm','card-tx','card-nint','card-ca','card-ats'];
 
 function saveChartVisibility() {
   const state = {};
@@ -1171,11 +1181,93 @@ function updateAgencesSection() {
   tbody.appendChild(totTr);
 }
 
+// ─── ATS : offres publiées N vs N-1 ───────────────────────────
+function updateATS() {
+  const mKeys = Object.keys(STATS_DATA).sort();
+  const hasAts = mKeys.some(k => STATS_DATA[k].ats);
+  const card = document.getElementById('card-ats');
+  if (!hasAts) return;
+  // Seulement afficher si pas caché par l'utilisateur
+  const visBtn = document.getElementById('vis-card-ats');
+  if (visBtn && !visBtn.classList.contains('active')) return;
+  card.style.display = '';
+
+  const labels = mKeys.map(k => STATS_DATA[k].label);
+  const dataN  = mKeys.map(k => STATS_DATA[k].ats?.n  ?? null);
+  const dataN1 = mKeys.map(k => STATS_DATA[k].ats?.n1 ?? null);
+
+  // Badge évolution globale
+  const sumN  = dataN.reduce((s, v)  => s + (v  || 0), 0);
+  const sumN1 = dataN1.reduce((s, v) => s + (v  || 0), 0);
+  const pct   = sumN1 > 0 ? ((sumN - sumN1) / sumN1 * 100).toFixed(1) : null;
+  document.getElementById('b-ats').textContent =
+    pct != null ? `${sumN.toLocaleString('fr-FR')} offres (${pct > 0 ? '+' : ''}${pct} % vs N-1)` : `${sumN.toLocaleString('fr-FR')} offres`;
+
+  const yearN  = mKeys[0]?.slice(0, 4) || '2026';
+  const yearN1 = String(Number(yearN) - 1);
+
+  if (CH['c-ats']) CH['c-ats'].destroy();
+  const ctx = document.getElementById('c-ats').getContext('2d');
+  CH['c-ats'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: yearN,
+          data: dataN,
+          backgroundColor: '#3b82f6cc',
+          borderColor: '#3b82f6',
+          borderWidth: 1.5,
+          borderRadius: 5,
+        },
+        {
+          label: yearN1,
+          data: dataN1,
+          backgroundColor: '#94a3b844',
+          borderColor: '#94a3b8',
+          borderWidth: 1.5,
+          borderRadius: 5,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12, color: chartTick() } },
+        tooltip: {
+          callbacks: {
+            afterBody: (items) => {
+              const n  = items.find(i => i.dataset.label === yearN)?.raw;
+              const n1 = items.find(i => i.dataset.label === yearN1)?.raw;
+              if (n != null && n1 != null && n1 > 0) {
+                const diff = ((n - n1) / n1 * 100).toFixed(1);
+                return [`Évolution : ${diff > 0 ? '+' : ''}${diff} %`];
+              }
+              return [];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: chartTick() } },
+        y: {
+          grid: { color: chartGrid() },
+          ticks: { font: { size: 11 }, color: chartTick() },
+          beginAtZero: true,
+        }
+      }
+    }
+  });
+}
+
 // ─── Rendu global ──────────────────────────────────────────────
 function render() {
   updateKPIs();
   updateJBCards();
   updateCharts();
+  updateATS();
   updateTable();
   updateAgencesSection();
 }
