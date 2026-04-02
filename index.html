@@ -93,10 +93,20 @@
   <div class="jb-section">
     <div class="jb-section-hdr">
       <span class="card-ttl">Jobboards payants</span>
-      <label class="tbl-toggle">
-        <input type="checkbox" id="jb-hide-zero" checked onchange="updateJBCards()">
-        Masquer inactifs
-      </label>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <select id="jb-sort" onchange="updateJBCards()" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);background:var(--card);cursor:pointer;">
+          <option value="ca">Trier par CA</option>
+          <option value="roi_reel">Trier par ROI</option>
+          <option value="budget">Trier par Budget</option>
+          <option value="nb_cv">Trier par CVs</option>
+          <option value="marge">Trier par Marge</option>
+          <option value="source">Trier par Nom</option>
+        </select>
+        <label class="tbl-toggle">
+          <input type="checkbox" id="jb-hide-zero" checked onchange="updateJBCards()">
+          Masquer inactifs
+        </label>
+      </div>
     </div>
     <div class="jb-row" id="jb-row"></div>
   </div>
@@ -985,7 +995,12 @@ function updateJBCards() {
     return;
   }
 
-  visible.sort((a, b) => (b.ca || 0) - (a.ca || 0)).forEach(r => {
+  const jbSortKey = document.getElementById('jb-sort')?.value || 'ca';
+  visible.sort((a, b) => {
+    if (jbSortKey === 'source') return a.source.localeCompare(b.source);
+    return (b[jbSortKey] || 0) - (a[jbSortKey] || 0);
+  });
+  visible.forEach(r => {
     const roi = r.roi_reel;
     const roiCls  = roi == null || roi === -1 ? 'none'
                   : roi >= 1   ? 'green'

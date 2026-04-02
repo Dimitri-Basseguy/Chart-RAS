@@ -25,6 +25,10 @@ SHEET_NAME  = 0          # 0 = première feuille, ou nom ex: "Stats"
 HEADER_ROW  = 0          # Ligne d'entête (0-indexé, après skip_rows)
 SKIP_ROWS   = None       # Nombre de lignes à sauter avant l'entête (None = 0)
 
+# Plage de données à lire (None = tout)
+USE_COLS    = "A:R"      # Colonnes Excel à lire, ex: "A:R"
+MAX_ROWS    = 19         # Nb max de lignes de données (hors entête) — exclut les totaux en bas
+
 # Correspondance colonnes Excel → champs JSON
 # Clé = nom de colonne dans l'Excel (insensible à la casse)
 # Valeur = nom du champ JSON
@@ -59,7 +63,7 @@ GRATUIT_SOURCES = {
 }
 
 # Lignes résumé à ignorer (contiennent ces mots)
-SKIP_ROWS_CONTAINING = ["résumé", "resume", "total"]
+SKIP_ROWS_CONTAINING = ["résumé", "resume", "total", "calcul"]
 
 # ─── FONCTIONS ───────────────────────────────────────────────────────────────
 
@@ -79,7 +83,7 @@ def clean_val(v):
         except ValueError:
             return None
     try:
-        return float(s)
+        return round(float(s), 2)
     except ValueError:
         return v  # retourne la chaîne originale (ex: nom de source)
 
@@ -106,6 +110,8 @@ def import_month(excel_path, month_key, month_label):
         sheet_name=SHEET_NAME,
         header=HEADER_ROW,
         skiprows=SKIP_ROWS,
+        usecols=USE_COLS,
+        nrows=MAX_ROWS,
         dtype=str,          # tout en string, on parse nous-mêmes
     )
 
@@ -169,51 +175,76 @@ def import_month(excel_path, month_key, month_label):
     return {"label": month_label, "rows": rows}
 
 
+def extract_month_block(content, month_key):
+    """Trouve le bloc { ... } d'un mois dans data.js. Retourne (start, end) ou None."""
+    marker = f'"{month_key}":'
+    pos = content.find(marker)
+    if pos == -1:
+        return None
+    # Avancer jusqu'à l'accolade ouvrante
+    brace_start = content.index('{', pos)
+    depth = 0
+    for i in range(brace_start, len(content)):
+        if content[i] == '{':
+            depth += 1
+        elif content[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return (pos, i + 1)
+    return None
+
+
 def update_data_js(month_key, month_data, data_js_path="data.js"):
-    """Insère ou remplace le mois dans data.js."""
+    """Insère ou remplace le mois dans data.js, en préservant les champs manuels (ats, ...)."""
     if not os.path.exists(data_js_path):
-        print(f"ERREUR : {data_js_path} introuvable. Exécutez depuis le dossier du dashboard.")
+        print(f"ERREUR : {data_js_path} introuvable.")
         sys.exit(1)
 
     with open(data_js_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    # Sérialiser le nouveau mois (JSON indenté)
+    # ── Préserver les champs saisis manuellement ──────────────────
+    MANUAL_FIELDS = ['ats']
+    block = extract_month_block(content, month_key)
+    if block:
+        existing_json_str = content[block[0]:block[1]]
+        # Extraire uniquement le dict {} du mois (sans la clé "YYYY-MM":)
+        brace_idx = existing_json_str.index('{')
+        try:
+            existing = json.loads(existing_json_str[brace_idx:])
+            for field in MANUAL_FIELDS:
+                if field in existing and existing[field] is not None:
+                    month_data[field] = existing[field]
+                    print(f"  Champ '{field}' préservé : {existing[field]}")
+        except Exception:
+            pass
+
+    # ── Sérialiser le nouveau mois ────────────────────────────────
     json_str = json.dumps(month_data, ensure_ascii=False, indent=2)
-    # Indenter pour s'intégrer dans l'objet JS
-    indented = '\n'.join('  ' + line for line in json_str.split('\n'))
+    indented  = '\n'.join('  ' + line for line in json_str.split('\n'))
     new_entry = f'  "{month_key}": {indented}'
 
-    # Si le mois existe déjà → remplacer
-    pattern = rf'"({re.escape(month_key)})":\s*\{{[^}}]*(?:\{{[^}}]*\}}[^}}]*)?\}}'
-    # Approche simple : chercher le bloc entre "YYYY-MM": { ... }
-    # On reconstruit plutôt le fichier entièrement
-
-    # Extraire l'objet STATS_DATA existant et parser les clés/mois
-    # On cherche où insérer (avant le commentaire de fin ou avant le })
-    # Méthode robuste : on remplace le commentaire sentinelle
-
-    SENTINEL = "  // Ajoutez les mois suivants ici via import_excel.py"
-
-    if f'"{month_key}":' in content:
-        print(f"Mois {month_key} déjà présent → mise à jour.")
-        # Stratégie simple : ré-écrire le fichier en remplaçant le bloc du mois
-        # Pour rester simple, on demande à l'utilisateur de vérifier
-        # On utilise une regex multi-ligne conservative
-        print("Mise à jour automatique limitée. Supprimez le mois existant manuellement si besoin,")
-        print("ou laissez le script ajouter le mois — les deux coexisteront temporairement.")
-
-    if SENTINEL in content:
-        insert = f"{new_entry},\n{SENTINEL}"
-        new_content = content.replace(SENTINEL, insert)
+    # ── Remplacer ou insérer ──────────────────────────────────────
+    if block:
+        # Remplacer le bloc existant (en incluant la clé "YYYY-MM":)
+        # Vérifier s'il y a une virgule après le bloc
+        end = block[1]
+        suffix = content[end:end+2].strip()
+        if suffix.startswith(','):
+            end = content.index(',', end) + 1
+        new_content = content[:block[0]] + new_entry + content[end:]
+        print(f"Mois {month_key} mis à jour.")
     else:
-        # Fallback : insérer avant la dernière ligne de l'objet
-        # Trouver le dernier }; et insérer avant
+        # Insérer avant le dernier }
         last_brace = content.rfind('};')
         if last_brace == -1:
             print("ERREUR : Structure de data.js non reconnue.")
             sys.exit(1)
-        new_content = content[:last_brace] + f"{new_entry}\n" + content[last_brace:]
+        # Ajouter une virgule si le fichier contient déjà des mois
+        needs_comma = content[:last_brace].rstrip().endswith('}')
+        sep = ',\n' if needs_comma else '\n'
+        new_content = content[:last_brace] + sep + new_entry + '\n' + content[last_brace:]
+        print(f"Mois {month_key} ajouté.")
 
     with open(data_js_path, 'w', encoding='utf-8') as f:
         f.write(new_content)
