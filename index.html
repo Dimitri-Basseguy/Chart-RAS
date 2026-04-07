@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <script src="data.enc.js"></script>
   <script src="agences.enc.js"></script>
+  <script src="data_regions.enc.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -42,6 +43,12 @@
         <button               data-type="gratuit"  onclick="setType('gratuit')">Gratuites</button>
         <button               data-type="payant"   onclick="setType('payant')">Payantes</button>
       </div>
+    </div>
+    <div class="ctrl" id="ctrl-region" style="display:none">
+      <span class="ctrl-lbl">Région</span>
+      <select class="hdr-sel" id="sel-region" onchange="setRegion(this.value)">
+        <option value="all">Nationale</option>
+      </select>
     </div>
     <div class="ctrl">
       <div class="btn-grp">
@@ -354,8 +361,9 @@ function toggleDark() {
 }
 
 // ─── État global ───────────────────────────────────────────────
-let gMonth = 'all';
-let gType  = 'all';
+let gMonth  = 'all';
+let gType   = 'all';
+let gRegion = 'all';
 let gSortCol = 'ca';
 let gSortAsc = false;
 
@@ -370,6 +378,38 @@ const f = {
 };
 
 function sum(rows, key) { return rows.reduce((a, r) => a + (Number(r[key]) || 0), 0); }
+
+function getRegionRows(monthKey) {
+  if (!window.REGIONS_DATA || gRegion === 'all') return null;
+  if (monthKey === 'all') {
+    // Agréger toutes les régions sélectionnées sur tous les mois
+    const sourceMap = {};
+    Object.values(REGIONS_DATA).forEach(monthData => {
+      const rows = monthData.regions?.[gRegion] || [];
+      rows.forEach(r => {
+        if (!sourceMap[r.source]) sourceMap[r.source] = { source: r.source, type: r.type, budget: 0, nb_cv: 0, candidat_uniq: 0, new_cand: 0, nb_int: 0, n_int: 0, ca: 0, marge: 0 };
+        const s = sourceMap[r.source];
+        s.budget += r.budget || 0; s.nb_cv += r.nb_cv || 0;
+        s.candidat_uniq += r.candidat_uniq || 0; s.new_cand += r.new_cand || 0;
+        s.nb_int += r.nb_int || 0; s.n_int += r.n_int || 0;
+        s.ca += r.ca || 0; s.marge += r.marge || 0;
+      });
+    });
+    return Object.values(sourceMap).map(s => ({
+      ...s,
+      cpa_cv: s.budget > 0 && s.nb_cv > 0 ? s.budget / s.nb_cv : null,
+      tx_new_cand: s.nb_cv > 0 ? s.new_cand / s.nb_cv : null,
+      cpnc: s.new_cand > 0 && s.budget > 0 ? s.budget / s.new_cand : null,
+      tx_emploi: s.candidat_uniq > 0 ? s.nb_int / s.candidat_uniq : null,
+      cme: s.nb_int > 0 && s.budget > 0 ? s.budget / s.nb_int : null,
+      pct_n_int: s.nb_int > 0 ? s.n_int / s.nb_int : null,
+      pct_marge: s.ca > 0 ? s.marge / s.ca : null,
+      roi_brut: s.budget > 0 ? s.ca / s.budget : null,
+      roi_reel: s.budget > 0 ? s.marge / s.budget : null,
+    }));
+  }
+  return REGIONS_DATA[monthKey]?.regions?.[gRegion] || [];
+}
 
 function getAggregatedData() {
   const sourceMap = {};
@@ -404,7 +444,10 @@ function getAggregatedData() {
 }
 
 function getData() {
-  const rows = gMonth === 'all' ? getAggregatedData() : (STATS_DATA[gMonth]?.rows || []);
+  const regionRows = getRegionRows(gMonth);
+  const rows = regionRows !== null ? regionRows
+             : gMonth === 'all' ? getAggregatedData()
+             : (STATS_DATA[gMonth]?.rows || []);
   return gType === 'all' ? rows : rows.filter(r => r.type === gType);
 }
 
@@ -527,6 +570,27 @@ function initMonthSel() {
       sel.appendChild(o);
     });
   sel.onchange = () => { gMonth = sel.value; render(); };
+}
+
+function initRegionSel() {
+  if (!window.REGIONS_DATA) return;
+  const regions = new Set();
+  Object.values(REGIONS_DATA).forEach(m =>
+    Object.keys(m.regions || {}).forEach(r => regions.add(r))
+  );
+  if (regions.size === 0) return;
+  const sel = document.getElementById('sel-region');
+  [...regions].sort().forEach(r => {
+    const o = document.createElement('option');
+    o.value = r; o.textContent = r;
+    sel.appendChild(o);
+  });
+  document.getElementById('ctrl-region').style.display = '';
+}
+
+function setRegion(r) {
+  gRegion = r;
+  render();
 }
 
 function setType(t) {
@@ -1322,12 +1386,17 @@ async function unlock() {
   try {
     const js = await decryptData(pwd, ENCRYPTED_DATA);
     window.STATS_DATA = (new Function(js + '\nreturn STATS_DATA;'))();
-    // Déchiffrer agences si disponible
     if (typeof ENCRYPTED_AGENCES !== 'undefined') {
       try {
         const agJs = await decryptData(pwd, ENCRYPTED_AGENCES);
         window.AGENCES_DATA = (new Function(agJs + '\nreturn AGENCES_DATA;'))();
       } catch(e) { console.warn('Agences non déchiffrables', e); }
+    }
+    if (typeof ENCRYPTED_REGIONS !== 'undefined') {
+      try {
+        const rgJs = await decryptData(pwd, ENCRYPTED_REGIONS);
+        window.REGIONS_DATA = (new Function(rgJs + '\nreturn REGIONS_DATA;'))();
+      } catch(e) { console.warn('Régions non déchiffrables', e); }
     }
     sessionStorage.setItem('dashboard-pwd', pwd);
     document.getElementById('lock-overlay').classList.add('hidden');
@@ -1348,6 +1417,7 @@ function initDashboard() {
   buildColorMap();
   initMonthSel();
   initAgenceRegions();
+  initRegionSel();
   loadChartVisibility();
   render();
 }
@@ -1394,6 +1464,12 @@ document.getElementById('lock-pwd').addEventListener('keydown', e => {
         try {
           const agJs = await decryptData(saved, ENCRYPTED_AGENCES);
           window.AGENCES_DATA = (new Function(agJs + '\nreturn AGENCES_DATA;'))();
+        } catch(e) {}
+      }
+      if (typeof ENCRYPTED_REGIONS !== 'undefined') {
+        try {
+          const rgJs = await decryptData(saved, ENCRYPTED_REGIONS);
+          window.REGIONS_DATA = (new Function(rgJs + '\nreturn REGIONS_DATA;'))();
         } catch(e) {}
       }
       document.getElementById('lock-overlay').classList.add('hidden');

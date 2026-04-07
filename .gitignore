@@ -4,6 +4,7 @@
 # Données sensibles — ne jamais committer
 data.js
 agences.js
+data_regions.js
 *.xlsx
 
 # Python
