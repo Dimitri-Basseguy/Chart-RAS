@@ -163,7 +163,7 @@
     </div>
     <div class="card" id="card-bm" style="margin-bottom:0">
       <div class="card-hdr">
-        <span class="card-ttl">Budget vs Marge — sources payantes</span>
+        <span class="card-ttl">Budget vs Marge — sources payantes</span><span class="th-help" onclick="showThTooltip(this,'Budget : coefficient de pondération régionale',event)">?</span>
         <button class="chart-toggle" id="tog-bm" onclick="toggleZ('c-bm','tog-bm')">Masquer inactives</button>
         <span class="badge">€</span>
       </div>
@@ -175,7 +175,7 @@
   <div class="grid-3" id="grid-row3">
     <div class="card" id="card-tx" style="margin-bottom:0">
       <div class="card-hdr">
-        <span class="card-ttl">Taux Nouveaux (CV → Cand.)</span>
+        <span class="card-ttl">Taux Nouveaux (CV → Cand.)</span><span class="th-help" onclick="showThTooltip(this,'Source : nb CV / nb candidats nouveaux',event)">?</span>
         <button class="chart-toggle" id="tog-tx" onclick="toggleZ('c-tx-cand','tog-tx')">Masquer inactives</button>
         <span class="badge">%</span>
       </div>
@@ -183,7 +183,7 @@
     </div>
     <div class="card" id="card-nint" style="margin-bottom:0">
       <div class="card-hdr">
-        <span class="card-ttl">% Nouveaux intérimaires (nINT)</span>
+        <span class="card-ttl">% Nouveaux intérimaires</span><span class="th-help" onclick="showThTooltip(this,'Source : nb intérimaires / nb intérimaires nouveaux',event)">?</span>  
         <button class="chart-toggle" id="tog-nint" onclick="toggleZ('c-nint','tog-nint')">Masquer inactives</button>
         <span class="badge">fidélisation</span>
       </div>
