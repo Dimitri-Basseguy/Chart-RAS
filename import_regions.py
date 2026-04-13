@@ -163,7 +163,7 @@ def import_regions_sheet(path):
                 count += 1
                 i += 1
 
-            regions[region_name] = data_rows
+            regions[region_name] = {'rows': data_rows}
             print(f"    '{region_name}' : {len(data_rows)} sources")
         else:
             i += 1
@@ -177,6 +177,19 @@ def main():
         print("✗ Aucun fichier lead-*.xlsx trouvé.")
         sys.exit(1)
 
+    # Charger l'existant pour préserver les champs manuels (offres, ...)
+    MANUAL_FIELDS = ['offres']
+    existing = {}
+    if os.path.exists('data_regions.js'):
+        try:
+            with open('data_regions.js', encoding='utf-8') as f:
+                content = f.read()
+            js_obj = content.replace('const REGIONS_DATA =', '', 1).rstrip().rstrip(';')
+            import json as _json
+            existing = _json.loads(js_obj)
+        except Exception:
+            pass
+
     data = {}
     for f in files:
         key, label = parse_filename(f)
@@ -187,6 +200,13 @@ def main():
         if not regions:
             print(f"    ⚠  Aucune région trouvée")
             continue
+        # Préserver les champs manuels par région
+        for region_name, region_data in regions.items():
+            for field in MANUAL_FIELDS:
+                existing_val = existing.get(key, {}).get('regions', {}).get(region_name, {}).get(field)
+                if existing_val is not None:
+                    region_data[field] = existing_val
+                    print(f"    Champ '{field}' préservé pour {region_name}")
         data[key] = {'label': label, 'regions': regions}
 
     if not data:

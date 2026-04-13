@@ -129,6 +129,7 @@
     <button class="vis-btn active" id="vis-card-nint" onclick="toggleChart('card-nint')">% nINT</button>
     <button class="vis-btn active" id="vis-card-ca"   onclick="toggleChart('card-ca')">CA source</button>
     <button class="vis-btn active" id="vis-card-ats"  onclick="toggleChart('card-ats')">Offres ATS</button>
+    <button class="vis-btn active" id="vis-card-offres-reg" onclick="toggleChart('card-offres-reg')">Offres régions</button>
   </div>
 
   <!-- Charts row 1 : CVs + Intérimaires -->
@@ -223,13 +224,22 @@
     </div>
   </div>
 
-  <!-- ATS : offres publiées N vs N-1 -->
-  <div id="card-ats" class="card" style="display:none">
-    <div class="card-hdr">
-      <span class="card-ttl">Offres publiées ATS — comparaison N vs N-1</span>
-      <span class="badge" id="b-ats">—</span>
+  <!-- ATS + Offres régions -->
+  <div class="grid-2" id="grid-ats-row" style="display:none">
+    <div id="card-ats" class="card" style="display:none;margin-bottom:0">
+      <div class="card-hdr">
+        <span class="card-ttl">Offres en lignes ATS — comparaison N vs N-1</span>
+        <span class="badge" id="b-ats">—</span>
+      </div>
+      <div class="chart-box" style="height:260px"><canvas id="c-ats"></canvas></div>
     </div>
-    <div class="chart-box" style="height:260px"><canvas id="c-ats"></canvas></div>
+    <div id="card-offres-reg" class="card" style="display:none;margin-bottom:0">
+      <div class="card-hdr">
+        <span class="card-ttl">Évolution nouvelles offres créées — par région</span>
+        <span class="badge" id="b-offres-reg">—</span>
+      </div>
+      <div class="chart-box" style="height:260px"><canvas id="c-offres-reg"></canvas></div>
+    </div>
   </div>
 
   <!-- Tableau complet -->
@@ -379,14 +389,24 @@ const f = {
 
 function sum(rows, key) { return rows.reduce((a, r) => a + (Number(r[key]) || 0), 0); }
 
+// Extrait uniquement les lignes sources (ignore l'objet {offres:N} en tête de tableau)
+function regionDataRows(arr) {
+  if (!arr) return [];
+  return Array.isArray(arr) ? arr.filter(r => r.source) : (arr.rows || []).filter(r => r.source);
+}
+// Extrait la valeur offres d'un tableau région
+function regionOffres(arr) {
+  if (!arr) return null;
+  if (Array.isArray(arr)) { const o = arr.find(r => 'offres' in r && !r.source); return o ? o.offres : null; }
+  return arr.offres ?? null;
+}
+
 function getRegionRows(monthKey) {
   if (!window.REGIONS_DATA || gRegion === 'all') return null;
   if (monthKey === 'all') {
-    // Agréger toutes les régions sélectionnées sur tous les mois
     const sourceMap = {};
     Object.values(REGIONS_DATA).forEach(monthData => {
-      const rows = monthData.regions?.[gRegion] || [];
-      rows.forEach(r => {
+      regionDataRows(monthData.regions?.[gRegion]).forEach(r => {
         if (!sourceMap[r.source]) sourceMap[r.source] = { source: r.source, type: r.type, budget: 0, nb_cv: 0, candidat_uniq: 0, new_cand: 0, nb_int: 0, n_int: 0, ca: 0, marge: 0 };
         const s = sourceMap[r.source];
         s.budget += r.budget || 0; s.nb_cv += r.nb_cv || 0;
@@ -408,7 +428,7 @@ function getRegionRows(monthKey) {
       roi_reel: s.budget > 0 ? s.marge / s.budget : null,
     }));
   }
-  return REGIONS_DATA[monthKey]?.regions?.[gRegion] || [];
+  return regionDataRows(REGIONS_DATA[monthKey]?.regions?.[gRegion]) || null;
 }
 
 function getAggregatedData() {
@@ -468,7 +488,7 @@ function buildColorMap() {
 }
 
 // ─── Visibilité des charts ──────────────────────────────────────
-const CHART_CARDS = ['card-cv','card-int','card-roi','card-bm','card-tx','card-nint','card-ca','card-ats'];
+const CHART_CARDS = ['card-cv','card-int','card-roi','card-bm','card-tx','card-nint','card-ca','card-ats','card-offres-reg'];
 
 function saveChartVisibility() {
   const state = {};
@@ -487,7 +507,7 @@ function loadChartVisibility() {
       document.getElementById(id).style.display = visible ? '' : 'none';
       document.getElementById('vis-' + id).classList.toggle('active', visible);
     });
-    ['grid-row1','grid-row2','grid-row3'].forEach(gridId => {
+    ['grid-row1','grid-row2','grid-row3','grid-ats-row'].forEach(gridId => {
       const grid = document.getElementById(gridId);
       if (!grid) return;
       const allHidden = Array.from(grid.querySelectorAll('.card')).every(c => c.style.display === 'none');
@@ -502,7 +522,7 @@ function toggleChart(cardId) {
   const willShow = card.style.display === 'none';
   card.style.display = willShow ? '' : 'none';
   btn.classList.toggle('active', willShow);
-  ['grid-row1','grid-row2','grid-row3'].forEach(gridId => {
+  ['grid-row1','grid-row2','grid-row3','grid-ats-row'].forEach(gridId => {
     const grid = document.getElementById(gridId);
     if (!grid) return;
     const allHidden = Array.from(grid.querySelectorAll('.card')).every(c => c.style.display === 'none');
@@ -912,7 +932,7 @@ function updateEvo() {
     label: src,
     data: mKeys.map(k => {
       const rows = (gRegion !== 'all' && window.REGIONS_DATA)
-        ? (REGIONS_DATA[k]?.regions?.[gRegion] || [])
+        ? regionDataRows(REGIONS_DATA[k]?.regions?.[gRegion])
         : STATS_DATA[k].rows;
       const r = rows.find(r => r.source === src);
       return r ? (r[metric] || 0) : 0;
@@ -1271,8 +1291,9 @@ function updateATS() {
   if (!hasAts) return;
   // Seulement afficher si pas caché par l'utilisateur
   const visBtn = document.getElementById('vis-card-ats');
-  if (visBtn && !visBtn.classList.contains('active')) return;
+  if (visBtn && !visBtn.classList.contains('active')) { card.style.display = 'none'; return; }
   card.style.display = '';
+  document.getElementById('grid-ats-row').style.display = '';
 
   const labels = mKeys.map(k => STATS_DATA[k].label);
   const dataN  = mKeys.map(k => STATS_DATA[k].ats?.n  ?? null);
@@ -1344,12 +1365,114 @@ function updateATS() {
   });
 }
 
+// ─── Offres créées par région (évolution mensuelle) ────────────
+const REGION_COLORS = [
+  '#3b82f6','#22c55e','#f59e0b','#8b5cf6','#f43f5e',
+  '#14b8a6','#ec4899','#06b6d4','#84cc16','#6366f1',
+];
+
+function updateOffresRegions() {
+  if (typeof REGIONS_DATA === 'undefined') return;
+  const card   = document.getElementById('card-offres-reg');
+  const visBtn = document.getElementById('vis-card-offres-reg');
+  if (visBtn && !visBtn.classList.contains('active')) { card.style.display = 'none'; return; }
+
+  const mKeys  = Object.keys(REGIONS_DATA).sort();
+  if (!mKeys.length) return;
+
+  // Toutes les régions présentes
+  const allRegions = [];
+  mKeys.forEach(k => {
+    Object.keys(REGIONS_DATA[k].regions || {}).forEach(r => {
+      if (!allRegions.includes(r)) allRegions.push(r);
+    });
+  });
+  allRegions.sort();
+
+  // Filtrer selon la région sélectionnée
+  const visibleRegions = (gRegion !== 'all') ? [gRegion] : allRegions;
+
+  // Vérifier qu'au moins une région a des données d'offres
+  const hasData = mKeys.some(k =>
+    visibleRegions.some(r => regionOffres(REGIONS_DATA[k]?.regions?.[r]) != null)
+  );
+  if (!hasData) return;
+
+  card.style.display = '';
+  document.getElementById('grid-ats-row').style.display = '';
+
+  const labels = mKeys.map(k => REGIONS_DATA[k].label);
+
+  const datasets = visibleRegions.map((reg, i) => {
+    // Conserver la couleur stable par région (index dans allRegions)
+    const colorIdx = allRegions.indexOf(reg);
+    const color = REGION_COLORS[colorIdx % REGION_COLORS.length];
+    const data  = mKeys.map(k => regionOffres(REGIONS_DATA[k]?.regions?.[reg]) ?? null);
+    return {
+      label: reg,
+      data,
+      borderColor: color,
+      backgroundColor: color + '33',
+      borderWidth: 2,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      tension: 0.3,
+      fill: false,
+      spanGaps: true,
+    };
+  });
+
+  // Badge : total selon les filtres actifs
+  // - mois sélectionné → total de ce mois (régions visibles)
+  // - tous mois → total cumulé (régions visibles)
+  let badgeTotal = 0;
+  let badgeLabel = '';
+  if (gMonth !== 'all' && REGIONS_DATA[gMonth]) {
+    badgeTotal = visibleRegions.reduce((s, r) => s + (regionOffres(REGIONS_DATA[gMonth]?.regions?.[r]) || 0), 0);
+    badgeLabel = REGIONS_DATA[gMonth].label;
+  } else {
+    badgeTotal = mKeys.reduce((s, k) =>
+      s + visibleRegions.reduce((s2, r) => s2 + (regionOffres(REGIONS_DATA[k]?.regions?.[r]) || 0), 0), 0);
+    badgeLabel = 'total';
+  }
+  document.getElementById('b-offres-reg').textContent =
+    badgeTotal ? `${badgeTotal.toLocaleString('fr-FR')} offres — ${badgeLabel}` : '—';
+
+  if (CH['c-offres-reg']) CH['c-offres-reg'].destroy();
+  const ctx = document.getElementById('c-offres-reg').getContext('2d');
+  CH['c-offres-reg'] = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12, color: chartTick() } },
+        tooltip: {
+          callbacks: {
+            label: (item) => ` ${item.dataset.label} : ${item.raw != null ? item.raw.toLocaleString('fr-FR') + ' offres' : '–'}`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: chartTick() } },
+        y: {
+          grid: { color: chartGrid() },
+          ticks: { font: { size: 11 }, color: chartTick() },
+          beginAtZero: true,
+        }
+      }
+    }
+  });
+}
+
 // ─── Rendu global ──────────────────────────────────────────────
 function render() {
   updateKPIs();
   updateJBCards();
   updateCharts();
   updateATS();
+  updateOffresRegions();
   updateTable();
   updateAgencesSection();
 }
