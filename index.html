@@ -911,7 +911,10 @@ function updateEvo() {
   const datasets = sources.map(src => ({
     label: src,
     data: mKeys.map(k => {
-      const r = STATS_DATA[k].rows.find(r => r.source === src);
+      const rows = (gRegion !== 'all' && window.REGIONS_DATA)
+        ? (REGIONS_DATA[k]?.regions?.[gRegion] || [])
+        : STATS_DATA[k].rows;
+      const r = rows.find(r => r.source === src);
       return r ? (r[metric] || 0) : 0;
     }),
     borderColor: SOURCE_COLORS[src] || '#999',
