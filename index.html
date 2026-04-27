@@ -228,7 +228,7 @@
   <div class="grid-2" id="grid-ats-row" style="display:none">
     <div id="card-ats" class="card" style="display:none;margin-bottom:0">
       <div class="card-hdr">
-        <span class="card-ttl">Offres en lignes ATS — comparaison N vs N-1</span>
+        <span class="card-ttl">Nouvelles offres publiées ATS — évolution mensuelle</span><span class="th-help" onclick="showThTooltip(this,'Nb de nouvelles offres publiées via l\'ATS chaque mois, ne prend pas en compte les offres anciennement republiées',event)">?</span>
         <span class="badge" id="b-ats">—</span>
       </div>
       <div class="chart-box" style="height:260px"><canvas id="c-ats"></canvas></div>
@@ -1283,31 +1283,33 @@ function updateAgencesSection() {
   tbody.appendChild(totTr);
 }
 
-// ─── ATS : offres publiées N vs N-1 ───────────────────────────
+// ─── ATS : offres publiées (évolution mensuelle) ──────────────
 function updateATS() {
   const mKeys = Object.keys(STATS_DATA).sort();
-  const hasAts = mKeys.some(k => STATS_DATA[k].ats);
+  const hasAts = mKeys.some(k => STATS_DATA[k].ats != null);
   const card = document.getElementById('card-ats');
   if (!hasAts) return;
-  // Seulement afficher si pas caché par l'utilisateur
   const visBtn = document.getElementById('vis-card-ats');
   if (visBtn && !visBtn.classList.contains('active')) { card.style.display = 'none'; return; }
   card.style.display = '';
   document.getElementById('grid-ats-row').style.display = '';
 
   const labels = mKeys.map(k => STATS_DATA[k].label);
-  const dataN  = mKeys.map(k => STATS_DATA[k].ats?.n  ?? null);
-  const dataN1 = mKeys.map(k => STATS_DATA[k].ats?.n1 ?? null);
+  const dataVals = mKeys.map(k => {
+    const v = STATS_DATA[k].ats;
+    if (v == null) return null;
+    return typeof v === 'object' ? (v.n ?? null) : Number(v);
+  });
 
-  // Badge évolution globale
-  const sumN  = dataN.reduce((s, v)  => s + (v  || 0), 0);
-  const sumN1 = dataN1.reduce((s, v) => s + (v  || 0), 0);
-  const pct   = sumN1 > 0 ? ((sumN - sumN1) / sumN1 * 100).toFixed(1) : null;
-  document.getElementById('b-ats').textContent =
-    pct != null ? `${sumN.toLocaleString('fr-FR')} offres (${pct > 0 ? '+' : ''}${pct} % vs N-1)` : `${sumN.toLocaleString('fr-FR')} offres`;
-
-  const yearN  = mKeys[0]?.slice(0, 4) || '2026';
-  const yearN1 = String(Number(yearN) - 1);
+  // Badge : total + évolution dernier mois vs précédent
+  const total = dataVals.reduce((s, v) => s + (v || 0), 0);
+  const last  = dataVals.filter(v => v != null);
+  let badgeSuffix = '';
+  if (last.length >= 2) {
+    const pct = ((last[last.length-1] - last[last.length-2]) / last[last.length-2] * 100).toFixed(1);
+    badgeSuffix = ` (${pct > 0 ? '+' : ''}${pct} % vs mois préc.)`;
+  }
+  document.getElementById('b-ats').textContent = `${total.toLocaleString('fr-FR')} offres${badgeSuffix}`;
 
   if (CH['c-ats']) CH['c-ats'].destroy();
   const ctx = document.getElementById('c-ats').getContext('2d');
@@ -1315,41 +1317,23 @@ function updateATS() {
     type: 'bar',
     data: {
       labels,
-      datasets: [
-        {
-          label: yearN,
-          data: dataN,
-          backgroundColor: '#3b82f6cc',
-          borderColor: '#3b82f6',
-          borderWidth: 1.5,
-          borderRadius: 5,
-        },
-        {
-          label: yearN1,
-          data: dataN1,
-          backgroundColor: '#94a3b844',
-          borderColor: '#94a3b8',
-          borderWidth: 1.5,
-          borderRadius: 5,
-        },
-      ]
+      datasets: [{
+        label: 'Offres créées',
+        data: dataVals,
+        backgroundColor: '#3b82f6cc',
+        borderColor: '#3b82f6',
+        borderWidth: 1.5,
+        borderRadius: 5,
+      }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12, color: chartTick() } },
+        legend: { display: false },
         tooltip: {
           callbacks: {
-            afterBody: (items) => {
-              const n  = items.find(i => i.dataset.label === yearN)?.raw;
-              const n1 = items.find(i => i.dataset.label === yearN1)?.raw;
-              if (n != null && n1 != null && n1 > 0) {
-                const diff = ((n - n1) / n1 * 100).toFixed(1);
-                return [`Évolution : ${diff > 0 ? '+' : ''}${diff} %`];
-              }
-              return [];
-            }
+            label: (item) => ` ${item.raw != null ? item.raw.toLocaleString('fr-FR') + ' offres' : '–'}`
           }
         }
       },

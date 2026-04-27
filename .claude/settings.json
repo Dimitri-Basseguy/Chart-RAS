@@ -9,7 +9,8 @@
       "Bash(grep -c '\"\"agence\"\"' data.js)",
       "Bash(grep -n '\"\"agences\"\"' data.js)",
       "Bash(grep -n '\"\"label\"\"' data.js)",
-      "Bash(python3 -c ':*)"
+      "Bash(python3 -c ':*)",
+      "Bash(python3 -)"
     ]
   }
 }

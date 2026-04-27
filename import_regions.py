@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-import_regions.py — Génère data_regions.js depuis les fichiers lead-*.xlsx
-Feuille ciblée : "Régions"
+import_regions.py — Importe la feuille "Régions" d'un fichier Excel → data_regions.js
 
-Usage : python3 import_regions.py
+Usage :
+    python3 import_regions.py lead-mars-2026.xlsx   # ajoute/met à jour ce mois
+    python3 import_regions.py                        # relit tous les lead-*.xlsx (mode legacy)
 """
 
 import openpyxl, json, glob, re, os, sys
@@ -13,6 +14,7 @@ FILE_RE       = re.compile(r'lead-(\w+)-(\d{4})\.xlsx', re.IGNORECASE)
 REGION_MARKER = 'choix région =>'
 MAX_DATA_ROWS = 19
 SKIP_SOURCES  = ["résumé", "resume", "total", "calcul"]
+MANUAL_FIELDS = ['offres']
 
 MONTH_NAMES = {
     'janv':'Janvier','fev':'Février','mars':'Mars','avr':'Avril',
@@ -116,13 +118,11 @@ def import_regions_sheet(path):
                 i += 1
                 continue
 
-            # Ligne suivante = en-têtes colonnes
             i += 1
             if i >= len(all_rows):
                 break
             header = [str(h).strip().lower() if h else '' for h in all_rows[i]]
 
-            # Mapper colonnes → clés JSON
             col_idx = {}
             for j, h in enumerate(header):
                 for col_key, json_key in COL_MAP.items():
@@ -130,7 +130,6 @@ def import_regions_sheet(path):
                         col_idx[j] = json_key
                         break
 
-            # Lire les lignes de données
             data_rows = []
             i += 1
             count = 0
@@ -171,25 +170,69 @@ def import_regions_sheet(path):
     return regions
 
 
-def main():
+def load_existing():
+    """Charge data_regions.js et retourne le dict existant."""
+    if not os.path.exists('data_regions.js'):
+        return {}
+    try:
+        with open('data_regions.js', encoding='utf-8') as f:
+            content = f.read()
+        js_obj = content.replace('const REGIONS_DATA =', '', 1).rstrip().rstrip(';')
+        return json.loads(js_obj)
+    except Exception:
+        return {}
+
+
+def preserve_manual(regions, existing_month):
+    """Recopie les champs manuels (offres) depuis l'existant vers les nouvelles données."""
+    for region_name, region_data in regions.items():
+        for field in MANUAL_FIELDS:
+            existing_val = existing_month.get('regions', {}).get(region_name, {}).get(field)
+            if existing_val is not None:
+                region_data[field] = existing_val
+                print(f"    Champ '{field}' préservé pour {region_name}")
+
+
+def save(data):
+    js = 'const REGIONS_DATA = ' + json.dumps(data, ensure_ascii=False, indent=2) + ';\n'
+    with open('data_regions.js', 'w', encoding='utf-8') as f:
+        f.write(js)
+    total = sum(len(v['regions']) for v in data.values())
+    print(f"\n✓ data_regions.js — {len(data)} mois, {total} blocs région, {len(js):,} car.")
+    print("  Étape suivante : python3 encrypt_regions.py")
+
+
+def import_one(excel_path):
+    """Importe un seul fichier et met à jour data_regions.js."""
+    key, label = parse_filename(excel_path)
+    if not key:
+        print(f"✗ Impossible de détecter le mois depuis '{excel_path}'.")
+        print("  Nommez le fichier : lead-mars-2026.xlsx")
+        sys.exit(1)
+
+    print(f"  {excel_path}  →  {key} ({label})")
+    regions = import_regions_sheet(excel_path)
+    if not regions:
+        print("✗ Aucune région trouvée.")
+        sys.exit(1)
+
+    existing = load_existing()
+    preserve_manual(regions, existing.get(key, {}))
+
+    existing[key] = {'label': label, 'regions': regions}
+    # Trier les mois par ordre chronologique
+    data = dict(sorted(existing.items()))
+    save(data)
+
+
+def import_all():
+    """Relit tous les lead-*.xlsx (mode legacy)."""
     files = sorted(glob.glob('lead-*.xlsx'))
     if not files:
         print("✗ Aucun fichier lead-*.xlsx trouvé.")
         sys.exit(1)
 
-    # Charger l'existant pour préserver les champs manuels (offres, ...)
-    MANUAL_FIELDS = ['offres']
-    existing = {}
-    if os.path.exists('data_regions.js'):
-        try:
-            with open('data_regions.js', encoding='utf-8') as f:
-                content = f.read()
-            js_obj = content.replace('const REGIONS_DATA =', '', 1).rstrip().rstrip(';')
-            import json as _json
-            existing = _json.loads(js_obj)
-        except Exception:
-            pass
-
+    existing = load_existing()
     data = {}
     for f in files:
         key, label = parse_filename(f)
@@ -200,27 +243,21 @@ def main():
         if not regions:
             print(f"    ⚠  Aucune région trouvée")
             continue
-        # Préserver les champs manuels par région
-        for region_name, region_data in regions.items():
-            for field in MANUAL_FIELDS:
-                existing_val = existing.get(key, {}).get('regions', {}).get(region_name, {}).get(field)
-                if existing_val is not None:
-                    region_data[field] = existing_val
-                    print(f"    Champ '{field}' préservé pour {region_name}")
+        preserve_manual(regions, existing.get(key, {}))
         data[key] = {'label': label, 'regions': regions}
 
     if not data:
         print("✗ Aucune donnée importée.")
         sys.exit(1)
 
-    js = 'const REGIONS_DATA = ' + json.dumps(data, ensure_ascii=False, indent=2) + ';\n'
-    with open('data_regions.js', 'w', encoding='utf-8') as f:
-        f.write(js)
-
-    total = sum(len(v['regions']) for v in data.values())
-    print(f"\n✓ data_regions.js — {len(data)} mois, {total} blocs région, {len(js):,} car.")
-    print("  Étape suivante : python3 encrypt_regions.py")
+    save(data)
 
 
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) >= 2:
+        if not os.path.exists(sys.argv[1]):
+            print(f"✗ Fichier introuvable : {sys.argv[1]}")
+            sys.exit(1)
+        import_one(sys.argv[1])
+    else:
+        import_all()

@@ -2,11 +2,8 @@
 import_excel.py — Convertit un fichier Excel mensuel → data.js
 
 Usage :
+    python import_excel.py lead-mars-2026.xlsx          # auto-détection depuis le nom
     python import_excel.py <fichier.xlsx> <YYYY-MM> "<Mois Année>"
-
-Exemples :
-    python import_excel.py stats_mars_2026.xlsx 2026-03 "Mars 2026"
-    python import_excel.py stats_avril_2026.xlsx 2026-04 "Avril 2026"
 
 Dépendances :
     pip install pandas openpyxl
@@ -17,6 +14,29 @@ import json
 import re
 import os
 import pandas as pd
+
+FILE_RE = re.compile(r'lead-(\w+)-(\d{4})\.xlsx', re.IGNORECASE)
+MONTH_NAMES = {
+    'janv':'Janvier','fev':'Février','mars':'Mars','avr':'Avril',
+    'mai':'Mai','juin':'Juin','juil':'Juillet','aout':'Août',
+    'sept':'Septembre','oct':'Octobre','nov':'Novembre','dec':'Décembre',
+}
+MONTH_NUMS = {
+    'janv':'01','fev':'02','mars':'03','avr':'04','mai':'05','juin':'06',
+    'juil':'07','aout':'08','sept':'09','oct':'10','nov':'11','dec':'12',
+}
+
+def parse_filename(filename):
+    m = FILE_RE.match(os.path.basename(filename))
+    if not m:
+        return None, None
+    mois = m.group(1).lower()
+    annee = m.group(2)
+    num  = MONTH_NUMS.get(mois)
+    name = MONTH_NAMES.get(mois)
+    if not num:
+        return None, None
+    return f"{annee}-{num}", f"{name} {annee}"
 
 # ─── CONFIG ─────────────────────────────────────────────────────────────────
 # Adaptez ces valeurs selon la structure de votre Excel
@@ -255,17 +275,28 @@ def update_data_js(month_key, month_data, data_js_path="data.js"):
 # ─── MAIN ────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(0)
 
-    excel_path  = sys.argv[1]
-    month_key   = sys.argv[2]   # ex: "2026-03"
-    month_label = sys.argv[3]   # ex: "Mars 2026"
+    excel_path = sys.argv[1]
 
     if not os.path.exists(excel_path):
         print(f"ERREUR : Fichier introuvable : {excel_path}")
         sys.exit(1)
+
+    # Auto-détection depuis le nom de fichier ou arguments explicites
+    if len(sys.argv) >= 4:
+        month_key   = sys.argv[2]
+        month_label = sys.argv[3]
+    else:
+        month_key, month_label = parse_filename(excel_path)
+        if not month_key:
+            print(f"ERREUR : Impossible de détecter le mois depuis '{excel_path}'.")
+            print("  Nommez le fichier : lead-mars-2026.xlsx")
+            print("  Ou passez les arguments : python3 import_excel.py fichier.xlsx 2026-03 'Mars 2026'")
+            sys.exit(1)
+        print(f"Mois détecté : {month_key} ({month_label})")
 
     if not re.match(r'^\d{4}-\d{2}$', month_key):
         print(f"ERREUR : Format de mois invalide '{month_key}'. Attendu : YYYY-MM")
@@ -273,4 +304,4 @@ if __name__ == "__main__":
 
     month_data = import_month(excel_path, month_key, month_label)
     update_data_js(month_key, month_data)
-    print("\nTerminé ! Rechargez dashboard.html dans votre navigateur.")
+    print("\nTerminé ! Rechargez le dashboard dans votre navigateur.")

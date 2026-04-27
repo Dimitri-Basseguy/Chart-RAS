@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-import_agences.py — Génère agences.js depuis les fichiers lead-*.xlsx
-Feuille ciblée : "STATS Agence"
+import_agences.py — Importe la feuille "STATS Agence" d'un fichier Excel → agences.js
 
-Usage : python3 import_agences.py
+Usage :
+    python3 import_agences.py lead-mars-2026.xlsx   # ajoute/met à jour ce mois
+    python3 import_agences.py                        # relit tous les lead-*.xlsx (mode legacy)
 """
 
 import openpyxl, json, glob, re, os, sys
@@ -102,7 +103,47 @@ def import_sheet(path):
     return result
 
 
-def main():
+def load_existing():
+    if not os.path.exists('agences.js'):
+        return {}
+    try:
+        with open('agences.js', encoding='utf-8') as f:
+            content = f.read()
+        js_obj = content.replace('const AGENCES_DATA =', '', 1).rstrip().rstrip(';')
+        return json.loads(js_obj)
+    except Exception:
+        return {}
+
+
+def save(data):
+    js = 'const AGENCES_DATA = ' + json.dumps(data, ensure_ascii=False, indent=2) + ';\n'
+    with open('agences.js', 'w', encoding='utf-8') as f:
+        f.write(js)
+    total = sum(len(v['rows']) for v in data.values())
+    print(f"\n✓ agences.js — {len(data)} mois, {total} agences, {len(js):,} car.")
+    print("  Étape suivante : python3 encrypt_agences.py")
+
+
+def import_one(excel_path):
+    key, label = parse_filename(excel_path)
+    if not key:
+        print(f"✗ Impossible de détecter le mois depuis '{excel_path}'.")
+        print("  Nommez le fichier : lead-mars-2026.xlsx")
+        sys.exit(1)
+
+    print(f"  {excel_path}  →  {key} ({label})")
+    rows = import_sheet(excel_path)
+    if not rows:
+        print("✗ Aucune agence trouvée.")
+        sys.exit(1)
+    print(f"    {len(rows)} agences")
+
+    existing = load_existing()
+    existing[key] = {'label': label, 'rows': rows}
+    save(dict(sorted(existing.items())))
+
+
+def import_all():
     files = sorted(glob.glob('lead-*.xlsx'))
     if not files:
         print("✗ Aucun fichier lead-*.xlsx trouvé.")
@@ -122,14 +163,14 @@ def main():
         print("✗ Aucune donnée importée.")
         sys.exit(1)
 
-    js = 'const AGENCES_DATA = ' + json.dumps(data, ensure_ascii=False, indent=2) + ';\n'
-    with open('agences.js', 'w', encoding='utf-8') as f:
-        f.write(js)
-
-    total = sum(len(v['rows']) for v in data.values())
-    print(f"\n✓ agences.js — {len(data)} mois, {total} agences, {len(js):,} car.")
-    print("  Étape suivante : python3 encrypt_agences.py")
+    save(data)
 
 
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) >= 2:
+        if not os.path.exists(sys.argv[1]):
+            print(f"✗ Fichier introuvable : {sys.argv[1]}")
+            sys.exit(1)
+        import_one(sys.argv[1])
+    else:
+        import_all()
